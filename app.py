@@ -29,9 +29,9 @@ async def get_all_Post_from_DB(username,_chat_id):
         try:
           if item["is_video"] is True :
               itemcount = itemcount + 1
-              payload = {"text": str(itemcount), "chat_id": chat_id}
+              payload = {"text": str(itemcount), "chat_id": _chat_id}
               message_url = f"{BOT_URL}/sendMessage"
-              await send_message_text(item["video_url"], chat_id)
+              await send_message_text(str(itemcount) + " Url - " + item["video_url"], _chat_id)
         except Exception as e:
           await send_error("Error in get_all_Post_from_DB #Loop items - " + str(e) ,_chat_id)
       return "Success"
@@ -89,11 +89,11 @@ def is_Instagram_photo(url):
     # Return False
     return False
 
-async def send_message_text(text_message,chat_id):
+async def send_message_text(text_message,_chat_id):
     async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
             try:
                 message_url = f"{BOT_URL}/sendMessage"
-                payload = {"text": text_message, "chat_id": chat_id}
+                payload = {"text": text_message, "chat_id": _chat_id}
                 async with session.post(message_url, json=payload) as response: # use post method to send message
                     resp = await response.json() # get the response data as JSON
                     return resp
@@ -101,11 +101,11 @@ async def send_message_text(text_message,chat_id):
                 print(e)
                 return None
 
-async def send_error(chat_id, error_message):
+async def send_error(_chat_id, error_message):
     async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
             try:
                 message_url = f"{BOT_URL}/sendMessage"
-                payload = {"text": error_message, "chat_id": chat_id}
+                payload = {"text": error_message, "chat_id": _chat_id}
                 async with session.post(message_url, json=payload) as response: # use post method to send message
                     resp = await response.json() # get the response data as JSON
                     return resp
