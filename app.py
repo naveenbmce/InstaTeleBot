@@ -296,6 +296,18 @@ async def url_setter():
             print(e)
             return None
 
+@app.get("/remove_webhook")
+async def url_remover():
+    remove_url = f"{BOT_URL}/deleteWebhook"
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(remove_url) as response:
+                webhook_result = await response.json()
+                return webhook_result
+        except Exception as e:
+            print(e)
+            return None
+
 @app.get("/get_webhook/")
 async def get_webhook():
     """Return the current webhook information"""
