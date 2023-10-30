@@ -13,16 +13,19 @@ async def get_webhook_info():
             data = await response.json()
             return data
 
-@app.get("/set_webhook")
-def url_setter():
+@app.post("/set_webhook")
+async def url_setter():
     PROG_URL = os.getenv("DETA_SPACE_APP_HOSTNAME")
     set_url = f"{BOT_URL}/setWebHook?url=https://{PROG_URL}/open"
-    resp = requests.get(set_url)
-    return resp.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(set_url) as response:
+            resp = await response.json()
+            return resp
 
-@app.get("/get_webhook/")
+@app.post("/get_webhook/")
 async def get_webhook():
     return await get_webhook_info()
+
 
 
 if __name__ == '__main__':
