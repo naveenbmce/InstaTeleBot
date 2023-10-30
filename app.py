@@ -18,6 +18,30 @@ video_pattern = r"https?://(www\.)?instagram\.com/(tv|reel)/([a-zA-Z0-9_-]+)/?\?
 # Pattern for Instagram photo URL
 photo_pattern = r"https?://(www\.)?instagram\.com/p/([a-zA-Z0-9_-]+)/?\??"
 
+async def get_all_Post_from_DB(username,_chat_id):
+  try:
+    db = deta.Base(username)
+    response = db.fetch({"owner": username})# check if the response has any items
+    itemcount = 0
+    if response.items:
+      # return True if the username exists
+      for item in responsedetails.items:
+        try:
+          if item["is_video"] is True :
+              itemcount = itemcount + 1
+              payload = {"text": str(itemcount), "chat_id": chat_id}
+              message_url = f"{BOT_URL}/sendMessage"
+              await send_message_text(item["video_url"], chat_id)
+        except Exception as e:
+          await send_error("Error in get_all_Post_from_DB #Loop items - " + str(e) ,_chat_id)
+      return True
+    else:
+      # return False if the username does not exist
+      return False
+  except Exception as e:
+    await send_error("Error in get_all_Post_from_DB - " + str(e) ,_chat_id)
+    return None
+
 async def is_Username_exist(username,_chat_id):
   try:
     db = deta.Base("Instagram_Master")
@@ -29,7 +53,7 @@ async def is_Username_exist(username,_chat_id):
       # return False if the username does not exist
       return False
   except Exception as e:
-    send_error("Error in db retrival" + str(e) ,_chat_id)
+    await send_error("Error in is_Username_exist - " + str(e) ,_chat_id)
     return None
     
 def is_Instagram_video(url):
