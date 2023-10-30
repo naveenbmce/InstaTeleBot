@@ -141,18 +141,18 @@ async def http_handler(request: Request):
       if is_Instagram_video(prompt):
           video_shortcode = is_Instagram_video(prompt)
           response_text = "This is a video URL - " + video_shortcode
-          send_message_text(response_text,chat_id)
+          await send_message_text(response_text,chat_id)
       elif is_Instagram_photo(prompt):
           photo_shortcode = is_Instagram_photo(prompt)
           response_text = "This is a photo URL - " + photo_shortcode
-          send_message_text(response_text,chat_id)
+          await send_message_text(response_text,chat_id)
       elif is_Instagram_profile(prompt):
           profile_username = is_Instagram_profile(prompt)
           response_text = "This is a profile URL - " + profile_username + " - Requested chat ID - " + str(chat_id)
-          send_message_text(response_text,chat_id)
+          await send_message_text(response_text,chat_id)
     else:
         response_text = ("This is not a valid Instagram URL")
-        send_message_text(response_text,chat_id)
+        await send_message_text(response_text,chat_id)
     
     return     
 
