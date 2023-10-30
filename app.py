@@ -164,7 +164,7 @@ async def http_handler(request: Request):
           profile_username = is_Instagram_profile(prompt)
           response_text = "This is a profile URL - " + profile_username + " - Requested chat ID - " + str(chat_id)
           user_available = await is_Username_exist(profile_username,chat_id)
-          response_text = response_text + " - is available - " + user_available
+          response_text = response_text + " - is available - " + str(user_available)
           await send_message_text(response_text,chat_id)
     else:
         response_text = ("This is not a valid Instagram URL")
