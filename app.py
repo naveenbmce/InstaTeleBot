@@ -7,7 +7,7 @@ import re
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
 BOT_URL = f"https://api.telegram.org/bot{BOT_KEY}"
-Deta_Key = os.environ[Deta_DB_KEY"]
+Deta_Key = os.environ["Deta_DB_KEY"]
 deta = Deta(Deta_Key)
 
 
