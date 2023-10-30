@@ -23,6 +23,7 @@ async def url_setter():
     """Set the webhook URL for Telegram API"""
     PROG_URL = os.environ["DETA_SPACE_APP_HOSTNAME"] # get the server URL from environment variable
     set_url = f"{BOT_URL}/setWebHook?url=https://{PROG_URL}/open"
+    print(set_url)
     async with aiohttp.ClientSession() as session:
         try:
             async with session.get(set_url) as response:
