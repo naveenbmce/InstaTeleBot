@@ -313,6 +313,25 @@ async def get_webhook():
     """Return the current webhook information"""
     return await get_webhook_info()
 
+@app.get("/SaveKey")
+def SaveKey():
+  rapid_db = deta.Base("Rapid_API_Keys")
+  rapid_db.put(data = {
+    "key": "210233aecbmsh61a7cefbf2c880cp18192cjsnfa3cbdb526ff",
+    "api_name": "Instagram-Data",
+    "is_Primary" : True})
+  rapid_db.put(data = {
+    "key": "90fe634f95mshab51bdbbb21aab9p16e278jsndb3368361c77",
+    "api_name": "Instagram-Data",
+    "is_Primary" : False})
+  rapid_db.put(
+      data={
+          "key": "9695caae8cmsh5842b4bfafdfb1bp1f2bb8jsncb130fa8e8be",
+          "api_name": "Instagram-Data",
+          "is_Primary": False
+      })
+  return "Success"
+
 @app.post("/open")
 async def http_handler(request: Request, background_tasks: BackgroundTasks):
     """Handle the incoming messages from Telegram"""
