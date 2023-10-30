@@ -40,6 +40,201 @@ async def get_all_Post_from_DB(username,_chat_id):
     await send_error("Error in get_all_Post_from_DB - " + str(e) ,_chat_id)
     return None
 
+async def get_instagram_posts(username, count, RapidAPI_Key):
+  try:
+    headers = {
+        'X-RapidAPI-Key': RapidAPI_Key,
+        'X-RapidAPI-Host': "instagram-data1.p.rapidapi.com"
+    }
+    data = []  # initialize an empty list to store the posts
+    end_cursor = None  # initialize a variable to store the end cursor
+    has_more = True  # initialize a variable to store the has more flag
+    requestURL = ""
+    async with aiohttp.ClientSession() as session:  # create an aiohttp client session object
+      while has_more:  # loop until there are no more posts
+        if end_cursor:  # if there is an end cursor, add it as a parameter
+          requestURL = "/user/feed?username=" + username + "&limit=" + str(
+              count) + "&end_cursor=" + str(end_cursor)
+        else:  # otherwise, just use the username and limit parameters
+          requestURL = "/user/feed?username=" + username + "&limit=" + str(count)
+        print(requestURL)
+        async with session.get("https://instagram-data1.p.rapidapi.com" + requestURL, headers=headers) as response:  # make the request with the parameters
+          status = response.status
+          # print the status code for debugging
+          print(status)
+          if status == 429:
+            raise Exception(f"Could not get a successful response given key")
+          res_data = await response.text()  # read the response data
+          json_to_base_db(username, res_data)
+          res_data = json_repair.loads(res_data)
+          end_cursor = res_data["end_cursor"]  # update the end cursor value
+          has_more = res_data["has_more"]  # update the has more flag
+  except Exception as e:
+    raise Exception(f"Could not get a successful response given key")
+
+  return data  # return the data list
+
+def get_instagram_posts_rotateKey(username, count):
+  rapid_db = deta.Base("Rapid_API_Keys")
+  response = rapid_db.fetch({"api_name": "Instagram-Data"})
+  items = response.items  # get the list of items from the response
+  index = 0  # initialize a variable to store the key index
+  success = False  # initialize a variable to store the success flag
+  while not success and index < len(items):  # loop until success or no more keys left
+    item = items[index]  # get the current item from the list
+    if item["is_Primary"] is True:  # if the item is primary, use its key
+      try:
+        print("Function get_instagram_posts")
+        get_instagram_posts(
+            username, count, item["key"]
+        )  # call the get_instagram_posts function with the key and store the data
+        success = True  # set the success flag to True
+        break  # break out of the loop
+      except Exception as e:  # if there is an exception, handle it
+        print(e)
+        rapid_db.put(data={
+            "key": item["key"],
+            "api_name": "Instagram-Data",
+            "is_Primary": False
+        })  # update the primary flag to False in the database
+        index += 1  # increment the index by 1
+        if index < len(items):  # if there is a next item in the list, update its primary flag to True in the database
+          next_item = items[index]
+          rapid_db.put(
+              data={
+                  "key": next_item["key"],
+                  "api_name": "Instagram-Data",
+                  "is_Primary": True
+              })
+          response = rapid_db.fetch({"api_name": "Instagram-Data"})
+          items = response.items
+    elif item["is_Primary"] is False:
+      index += 1
+
+  # if there was no success after trying all keys, raise an exception or return an error message
+  if not success:
+    rapid_db.put(data={
+        "key": items[0]["key"],
+        "is_Primary": True
+    })  # update the primary flag of the first item to True
+    raise Exception(f"Could not get any data with any of the keys")
+    # or return "Sorry, I could not get any data with any of the keys"
+
+  return "Success"  # return the data list
+
+
+def get_instagram_posts_rotateKey(username, count):
+  rapid_db = deta.Base("Rapid_API_Keys")
+  response = rapid_db.fetch({"api_name": "Instagram-Data"})
+  items = response.items  # get the list of items from the response
+  index = 0  # initialize a variable to store the key index
+  success = False  # initialize a variable to store the success flag
+  while not success and index < len(items):  # loop until success or no more keys left
+    item = items[index]  # get the current item from the list
+    if item["is_Primary"] is True:  # if the item is primary, use its key
+      try:
+        print("Function get_instagram_posts")
+        get_instagram_posts(
+            username, count, item["key"]
+        )  # call the get_instagram_posts function with the key and store the data
+        success = True  # set the success flag to True
+        break  # break out of the loop
+      except Exception as e:  # if there is an exception, handle it
+        print(e)
+        rapid_db.put(data={
+            "key": item["key"],
+            "api_name": "Instagram-Data",
+            "is_Primary": False
+        })  # update the primary flag to False in the database
+        index += 1  # increment the index by 1
+        if index < len(
+            items
+        ):  # if there is a next item in the list, update its primary flag to True in the database
+          next_item = items[index]
+          rapid_db.put(
+              data={
+                  "key": next_item["key"],
+                  "api_name": "Instagram-Data",
+                  "is_Primary": True
+              })
+          response = rapid_db.fetch({"api_name": "Instagram-Data"})
+          items = response.items
+    elif item["is_Primary"] is False:
+      index += 1
+  return "Success"
+
+
+def json_to_base_db(username, json_string):
+  # Load the JSON data as a Python object
+  json_data = json_repair.loads(json_string)
+  itercount = 0
+  # Loop through the JSON data
+  for item in json_data["collector"]:
+    try:
+      # Extract the relevant fields from the item
+      itercount = itercount + 1
+      print(itercount)
+      id = item.get("id", "")
+      owner_id = item.get("owner", {}).get("id", "")
+      owner = item.get("owner", {}).get("username", "")
+      type = item.get("type", "")
+      is_video = item.get("is_video", "")
+      video_url = item.get("video_url", "") if is_video else ""
+      height = item.get("dimension", {}).get("height", "")
+      width = item.get("dimension", {}).get("width", "")
+      thumbnail_src = item.get("thumbnail_src", "")
+      taken_at_timestamp = item.get("taken_at_timestamp", "")
+      shortcode = item.get("shortcode", "")
+      caption = item.get("description", "")
+      comments = item.get("comments", "")
+      likes = item.get("likes", "")
+      views = item.get("views", "") if is_video else ""
+      location = item.get("location", {}).get("name", "") if isinstance(
+          item.get("location"), dict) else ""
+      hashtags = ",".join(
+          item.get("hashtags",[])) if "hashtags" in item and item.get("hashtags") else ""
+      mentions = ",".join(
+          item.get("mentions",[])) if "mentions" in item and item.get("mentions") else ""
+      # Create a dictionary with the key and other fields
+      data = {
+          "key": id,
+          "owner_id": owner_id,
+          "owner": owner,
+          "type": type,
+          "is_video": is_video,
+          "video_url": video_url,
+          "height": height,
+          "width": width,
+          "thumbnail_src": thumbnail_src,
+          "taken_at_timestamp": taken_at_timestamp,
+          "shortcode": shortcode,
+          "caption": caption,
+          "comments": comments,
+          "likes": likes,
+          "views": views,
+          "location": location,
+          "hashtags": hashtags,
+          "mentions": mentions
+      }
+    except Exception as e:
+      print(e)
+      continue
+    # Use the put() method to store the data in the Base
+    db = deta.Base(username)
+    db.put(data)
+
+  master_data = {
+      "key": json_data["id"],
+      "username": username,
+      "media_count": json_data["count"],
+      "Tracking": True
+  }
+
+  master_db = deta.Base("Instagram_Master")
+  master_db.put(master_data)
+  return
+
+
 async def is_Username_exist(username,_chat_id):
   try:
     db = deta.Base("Instagram_Master")
