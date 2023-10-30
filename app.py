@@ -12,7 +12,14 @@ async def get_webhook_info():
         async with session.get(message_url) as response:
             data = await response.json()
             return data
-    
+
+@app.get("/set_webhook")
+def url_setter():
+    PROG_URL = os.getenv("DETA_SPACE_APP_HOSTNAME")
+    set_url = f"{BOT_URL}/setWebHook?url=https://{PROG_URL}/open"
+    resp = requests.get(set_url)
+    return resp.json()
+
 @app.get("/get_webhook/")
 async def get_webhook():
     return await get_webhook_info()
