@@ -147,7 +147,7 @@ async def get_webhook():
     return await get_webhook_info()
 
 @app.post("/open")
-async def http_handler(request: Request):
+async def http_handler(request: Request, background_tasks: BackgroundTasks):
     """Handle the incoming messages from Telegram"""
     try:
         incoming_data = await request.json() # parse the request data as JSON
@@ -192,9 +192,8 @@ async def http_handler(request: Request):
           await send_message_text(response_text,chat_id)
           if(user_available):
             try:
-              sendpost = await get_all_Post_from_DB(profile_username,chat_id)
-              response_text = str(sendpost)
-              await send_message_text("All Post Send Successfully !!! " + response_text,chat_id)
+              background_tasks.add_task(get_all_Post_from_DB, username=profile_username, _chat_id=chat_id)
+              await send_message_text("All Post Send Successfully !!! ",chat_id)
             except Exception as e:
               await send_error(response_text,chat_id)
             
