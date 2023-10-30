@@ -26,6 +26,27 @@ async def url_setter():
 async def get_webhook():
     return await get_webhook_info()
 
+@app.post("/open")
+async def http_handler(request: Request):
+    incoming_data = await request.json()
+    #prompt = incoming_data["message"]["text"]
+    prompt = incoming_data.get("message", {}).get("text", "No text found")
+    chat_id = incoming_data["message"]["chat"]["id"]
+    if "message" not in incoming_data:
+        print(incoming_data)
+        return send_error(None, "Unknown error, lol, handling coming soon")
+
+    if prompt in ["/start", "/help"]:
+        response_text = (
+            "welcome to InstgramBot"
+        )
+        payload = {"text": response_text, "chat_id": chat_id}
+        message_url = f"{BOT_URL}/sendMessage"
+        requests.post(message_url, json=payload).json()
+        return
+    
+    
+    return     
 
 
 if __name__ == '__main__':
