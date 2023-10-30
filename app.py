@@ -18,6 +18,20 @@ video_pattern = r"https?://(www\.)?instagram\.com/(tv|reel)/([a-zA-Z0-9_-]+)/?\?
 # Pattern for Instagram photo URL
 photo_pattern = r"https?://(www\.)?instagram\.com/p/([a-zA-Z0-9_-]+)/?\??"
 
+async def is_Username_exist(username,_chat_id):
+  try:
+    db = deta.Base("Instagram_Master")
+    response = db.fetch({"username": username})# check if the response has any items
+    if response.items:
+      # return True if the username exists
+      return True
+    else:
+      # return False if the username does not exist
+      return False
+  except Exception as e:
+    send_error("Error in db retrival" + str(e) ,_chat_id)
+    return None
+    
 def is_Instagram_video(url):
   # Check if the url is a video URL
   video_match = re.match(video_pattern, url)
@@ -149,6 +163,8 @@ async def http_handler(request: Request):
       elif is_Instagram_profile(prompt):
           profile_username = is_Instagram_profile(prompt)
           response_text = "This is a profile URL - " + profile_username + " - Requested chat ID - " + str(chat_id)
+          user_available = await is_Username_exist(profile_username,chat_id)
+          response_text = response_text + " - is available - " + user_available
           await send_message_text(response_text,chat_id)
     else:
         response_text = ("This is not a valid Instagram URL")
