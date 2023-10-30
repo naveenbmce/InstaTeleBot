@@ -85,58 +85,7 @@ def get_instagram_posts_rotateKey(username, count):
     if item["is_Primary"] is True:  # if the item is primary, use its key
       try:
         print("Function get_instagram_posts")
-        get_instagram_posts(
-            username, count, item["key"]
-        )  # call the get_instagram_posts function with the key and store the data
-        success = True  # set the success flag to True
-        break  # break out of the loop
-      except Exception as e:  # if there is an exception, handle it
-        print(e)
-        rapid_db.put(data={
-            "key": item["key"],
-            "api_name": "Instagram-Data",
-            "is_Primary": False
-        })  # update the primary flag to False in the database
-        index += 1  # increment the index by 1
-        if index < len(items):  # if there is a next item in the list, update its primary flag to True in the database
-          next_item = items[index]
-          rapid_db.put(
-              data={
-                  "key": next_item["key"],
-                  "api_name": "Instagram-Data",
-                  "is_Primary": True
-              })
-          response = rapid_db.fetch({"api_name": "Instagram-Data"})
-          items = response.items
-    elif item["is_Primary"] is False:
-      index += 1
-
-  # if there was no success after trying all keys, raise an exception or return an error message
-  if not success:
-    rapid_db.put(data={
-        "key": items[0]["key"],
-        "is_Primary": True
-    })  # update the primary flag of the first item to True
-    raise Exception(f"Could not get any data with any of the keys")
-    # or return "Sorry, I could not get any data with any of the keys"
-
-  return "Success"  # return the data list
-
-
-def get_instagram_posts_rotateKey(username, count):
-  rapid_db = deta.Base("Rapid_API_Keys")
-  response = rapid_db.fetch({"api_name": "Instagram-Data"})
-  items = response.items  # get the list of items from the response
-  index = 0  # initialize a variable to store the key index
-  success = False  # initialize a variable to store the success flag
-  while not success and index < len(items):  # loop until success or no more keys left
-    item = items[index]  # get the current item from the list
-    if item["is_Primary"] is True:  # if the item is primary, use its key
-      try:
-        print("Function get_instagram_posts")
-        get_instagram_posts(
-            username, count, item["key"]
-        )  # call the get_instagram_posts function with the key and store the data
+        get_instagram_posts(username, count, item["key"])  # call the get_instagram_posts function with the key and store the data
         success = True  # set the success flag to True
         break  # break out of the loop
       except Exception as e:  # if there is an exception, handle it
@@ -402,6 +351,9 @@ async def http_handler(request: Request, background_tasks: BackgroundTasks):
               await send_message_text("Task Started !!! ",chat_id)
             except Exception as e:
               await send_error(response_text,chat_id)
+          else:
+            background_tasks.add_task(get_instagram_posts_rotateKey, username=profile_username, count=50)
+            send_message_text(" - User Not Exist in db - Download Task Started ",chat_id)
             
     else:
         response_text = ("This is not a valid Instagram URL")
