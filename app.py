@@ -25,7 +25,7 @@ async def get_all_Post_from_DB(username,_chat_id):
     itemcount = 0
     if response.items:
       # return True if the username exists
-      for item in responsedetails.items:
+      for item in response.items:
         try:
           if item["is_video"] is True :
               itemcount = itemcount + 1
@@ -34,10 +34,10 @@ async def get_all_Post_from_DB(username,_chat_id):
               await send_message_text(item["video_url"], chat_id)
         except Exception as e:
           await send_error("Error in get_all_Post_from_DB #Loop items - " + str(e) ,_chat_id)
-      return True
+      return "Success"
     else:
       # return False if the username does not exist
-      return False
+      return "No video items"
   except Exception as e:
     await send_error("Error in get_all_Post_from_DB - " + str(e) ,_chat_id)
     return None
@@ -190,6 +190,14 @@ async def http_handler(request: Request):
           user_available = await is_Username_exist(profile_username,chat_id)
           response_text = response_text + " - is available - " + str(user_available)
           await send_message_text(response_text,chat_id)
+          if(user_available):
+            try:
+              sendpost = await get_all_Post_from_DB(profile_username,chat_id)
+              response_text = response_text + " - is available - " + str(user_available)
+              await send_message_text("All Post Send Successfully !!!",chat_id)
+            except Exception as e:
+              await send_error(response_text,chat_id)
+            
     else:
         response_text = ("This is not a valid Instagram URL")
         await send_message_text(response_text,chat_id)
