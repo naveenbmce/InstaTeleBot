@@ -89,6 +89,19 @@ def is_Instagram_photo(url):
     # Return False
     return False
 
+async def send_message_video(_video_url,_caption, _chat_id):
+  async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
+    try:
+      message_url = f"{BOT_URL}/sendVideo"
+      payload = {"chat_id": _chat_id, "video": _video_url,"caption":_caption,"supports_streaming":True}
+      async with session.post(message_url, json=payload) as response: # use post method to send message
+        resp = await response.json() # get the response data as JSON
+        return resp
+    except Exception as e:
+      print(e)
+      return None
+
+
 async def send_message_text(text_message,_chat_id):
     async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
             try:
@@ -193,7 +206,7 @@ async def http_handler(request: Request, background_tasks: BackgroundTasks):
           if(user_available):
             try:
               background_tasks.add_task(get_all_Post_from_DB, username=profile_username, _chat_id=chat_id)
-              await send_message_text("All Post Send Successfully !!! ",chat_id)
+              await send_message_text("Task Started !!! ",chat_id)
             except Exception as e:
               await send_error(response_text,chat_id)
             
