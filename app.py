@@ -1,10 +1,80 @@
 from fastapi import FastAPI, Request
 import os
 import aiohttp
+from deta import Deta
+import re
 
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
 BOT_URL = f"https://api.telegram.org/bot{BOT_KEY}"
+Deta_Key = os.environ[Deta_DB_KEY"]
+deta = Deta(Deta_Key)
+
+
+# Pattern for Instagram profile URL
+profile_pattern = r"https?://(www\.)?instagram\.com/([a-zA-Z0-9_.]+)/?\??"
+# Pattern for Instagram video URL
+video_pattern = r"https?://(www\.)?instagram\.com/(tv|reel)/([a-zA-Z0-9_-]+)/?\??"
+# Pattern for Instagram photo URL
+photo_pattern = r"https?://(www\.)?instagram\.com/p/([a-zA-Z0-9_-]+)/?\??"
+
+def is_Instagram_video(url):
+  # Check if the url is a video URL
+  video_match = re.match(video_pattern, url)
+  if video_match:
+    # Return the shortcode from the second group of the match object
+    shortcode = video_match.group(3)
+    return shortcode
+  else:
+    # Return False
+    return False
+
+def is_Instagram_profile(url):
+  # Check if the url is a profile URL
+  profile_match = re.match(profile_pattern, url)
+  if profile_match:
+    # Return the username from the second group of the match object
+    username = profile_match.group(2)
+    return username
+  else:
+    # Return False
+    return False
+
+def is_Instagram_photo(url):
+  # Check if the url is a photo URL
+  photo_match = re.match(photo_pattern, url)
+  if photo_match:
+    # Return the shortcode from the first group of the match object
+    shortcode = photo_match.group(2)
+    return shortcode
+  else:
+    # Return False
+    return False
+
+async def send_message_text(text_message,chat_id):
+    async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
+            try:
+                message_url = f"{BOT_URL}/sendMessage"
+                payload = {"text": text_message, "chat_id": chat_id}
+                async with session.post(message_url, json=payload) as response: # use post method to send message
+                    resp = await response.json() # get the response data as JSON
+                    return resp
+            except Exception as e:
+                print(e)
+                return None
+
+async def send_error(chat_id, error_message):
+    async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
+            try:
+                message_url = f"{BOT_URL}/sendMessage"
+                payload = {"text": error_message, "chat_id": chat_id}
+                async with session.post(message_url, json=payload) as response: # use post method to send message
+                    resp = await response.json() # get the response data as JSON
+                    return resp
+            except Exception as e:
+                print(e)
+                return None
+
 
 async def get_webhook_info():
     """Get the current webhook information from Telegram API"""
@@ -51,7 +121,7 @@ async def http_handler(request: Request):
 
     if "message" not in incoming_data:
         print(incoming_data)
-        return send_error(None, "Unknown error, lol, handling coming soon")
+        return await send_error(None, "Unknown error, lol, handling coming soon")
 
     if prompt in ["/start", "/help"]:
         response_text = (
@@ -67,6 +137,22 @@ async def http_handler(request: Request):
             except Exception as e:
                 print(e)
                 return None
+    if "instagram.com" in prompt:
+      if is_Instagram_video(prompt):
+          video_shortcode = is_Instagram_video(prompt)
+          response_text = "This is a video URL - " + video_shortcode
+          send_message_text(response_text,chat_id)
+      elif is_Instagram_photo(prompt):
+          photo_shortcode = is_Instagram_photo(prompt)
+          response_text = "This is a photo URL - " + photo_shortcode
+          send_message_text(response_text,chat_id)
+      elif is_Instagram_profile(prompt):
+          profile_username = is_Instagram_profile(prompt)
+          response_text = "This is a profile URL - " + profile_username + " - Requested chat ID - " + str(chat_id)
+          send_message_text(response_text,chat_id)
+    else:
+        response_text = ("This is not a valid Instagram URL")
+        send_message_text(response_text,chat_id)
     
     return     
 
