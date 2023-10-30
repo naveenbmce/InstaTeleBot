@@ -193,8 +193,8 @@ async def http_handler(request: Request):
           if(user_available):
             try:
               sendpost = await get_all_Post_from_DB(profile_username,chat_id)
-              response_text = response_text + " - is available - " + str(user_available)
-              await send_message_text("All Post Send Successfully !!!",chat_id)
+              response_text = str(sendpost)
+              await send_message_text("All Post Send Successfully !!! " + response_text,chat_id)
             except Exception as e:
               await send_error(response_text,chat_id)
             
