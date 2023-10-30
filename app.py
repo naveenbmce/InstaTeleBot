@@ -3,6 +3,7 @@ import os
 import aiohttp
 from deta import Deta
 import re
+import json_repair
 
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
@@ -74,7 +75,7 @@ async def get_instagram_posts(username, count, RapidAPI_Key):
 
   return data  # return the data list
 
-def get_instagram_posts_rotateKey(username, count):
+async def get_instagram_posts_rotateKey(username, count):
   rapid_db = deta.Base("Rapid_API_Keys")
   response = rapid_db.fetch({"api_name": "Instagram-Data"})
   items = response.items  # get the list of items from the response
@@ -85,7 +86,7 @@ def get_instagram_posts_rotateKey(username, count):
     if item["is_Primary"] is True:  # if the item is primary, use its key
       try:
         print("Function get_instagram_posts")
-        get_instagram_posts(username, count, item["key"])  # call the get_instagram_posts function with the key and store the data
+        await get_instagram_posts(username, count, item["key"])  # call the get_instagram_posts function with the key and store the data
         success = True  # set the success flag to True
         break  # break out of the loop
       except Exception as e:  # if there is an exception, handle it
