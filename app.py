@@ -29,9 +29,7 @@ async def get_all_Post_from_DB(username,_chat_id):
         try:
           if item["is_video"] is True :
               itemcount = itemcount + 1
-              payload = {"text": str(itemcount), "chat_id": _chat_id}
-              message_url = f"{BOT_URL}/sendMessage"
-              await send_message_text(str(itemcount), _chat_id)
+              await send_message_video(item["video_url"],item["caption"], _chat_id)
         except Exception as e:
           await send_error("Error in get_all_Post_from_DB #Loop items - " + str(e) ,_chat_id)
       return "Success"
