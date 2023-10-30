@@ -13,7 +13,7 @@ async def get_webhook_info():
             data = await response.json()
             return data
 
-@app.post("/set_webhook")
+@app.get("/set_webhook")
 async def url_setter():
     PROG_URL = os.getenv("DETA_SPACE_APP_HOSTNAME")
     set_url = f"{BOT_URL}/setWebHook?url=https://{PROG_URL}/open"
@@ -22,7 +22,7 @@ async def url_setter():
             resp = await response.json()
             return resp
 
-@app.post("/get_webhook/")
+@app.get("/get_webhook/")
 async def get_webhook():
     return await get_webhook_info()
 
