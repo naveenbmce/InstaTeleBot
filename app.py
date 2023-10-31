@@ -5,9 +5,9 @@ from deta import Deta
 import re
 import json_repair
 import uvicorn
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 
-load_dotenv()
+#load_dotenv()
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
 BOT_URL = f"https://api.telegram.org/bot{BOT_KEY}"
