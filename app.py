@@ -4,7 +4,10 @@ import aiohttp
 from deta import Deta
 import re
 import json_repair
+import uvicorn
+from dotenv import load_dotenv
 
+load_dotenv()
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
 BOT_URL = f"https://api.telegram.org/bot{BOT_KEY}"
@@ -242,6 +245,7 @@ async def send_message_video(_video_url,_caption, _chat_id):
         return resp
     except Exception as e:
       print(e)
+      await send_error("Error in send_message_video - " + str(e) ,_chat_id)
       return None
 
 
