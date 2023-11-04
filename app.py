@@ -1,18 +1,22 @@
 from fastapi import FastAPI, Request, BackgroundTasks
 import os
-import aiohttp
+import aiohttp 
+from aiohttp import ClientSession
 from deta import Deta
 import re
 import json_repair
 import uvicorn
+#Uncomment the below line if it is codespace
 #from dotenv import load_dotenv
-
 #load_dotenv()
+
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
 BOT_URL = f"https://api.telegram.org/bot{BOT_KEY}"
 Deta_Key = os.environ["Deta_DB_KEY"]
 deta = Deta(Deta_Key)
+CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
+Deta_Project_Id = os.environ["Deta_Project_Id"]
 
 
 # Pattern for Instagram profile URL
@@ -21,6 +25,72 @@ profile_pattern = r"https?://(www\.)?instagram\.com/([a-zA-Z0-9_.]+)/?\??"
 video_pattern = r"https?://(www\.)?instagram\.com/(tv|reel)/([a-zA-Z0-9_-]+)/?\??"
 # Pattern for Instagram photo URL
 photo_pattern = r"https?://(www\.)?instagram\.com/p/([a-zA-Z0-9_-]+)/?\??"
+
+async def get_video_by_shortcode(_shortcode,_fileType,_username ):
+  base_url = f'https://drive.deta.sh/v1/{Deta_Project_Id}/{_username}'
+  headers = {'X-API-Key': Deta_Key}
+  async with aiohttp.ClientSession(headers=headers) as session:
+      async with session.get(f'{base_url}/files/download?name={_shortcode}.{_fileType}') as resp:
+          if resp.status in (200, 206):
+              data = await resp.read()
+              return data
+              """ stream_reader = resp.content
+              data = await resp.read()
+              # Open the file in binary write mode
+              with open(f'{_shortcode}.{_fileType}', 'wb') as f:
+                  # Write the bytes data to the file
+                  f.write(data)
+              return stream_reader """
+          else:
+              return None
+
+   
+     
+async def upload_large_file(_file_path,_file_type,_project_id,_folder_name,_file_name):
+  base_url = f'https://drive.deta.sh/v1/{_project_id}/{_folder_name}'
+  headers = {'X-API-Key': Deta_Key}
+  async with aiohttp.ClientSession(headers=headers) as session:
+    async with session.post(base_url + f'/uploads?name={_file_name}.{_file_type}') as response:
+      response.raise_for_status()
+      upload_id = (await response.json())['upload_id']
+    part_number = 1
+    async with aiohttp.ClientSession(headers=headers) as session:
+      with open(_file_path, 'rb') as f:
+        while True:
+          chunk = f.read(CHUNK_SIZE)
+          if not chunk:
+            break
+          async with session.post(
+              base_url +
+              f'/uploads/{upload_id}/parts?name={_file_name}.{_file_type}&part={part_number}',
+              data=chunk) as response:
+            response.raise_for_status()
+          part_number += 1
+    async with aiohttp.ClientSession(headers=headers) as session:
+      async with session.patch(
+          base_url + f'/uploads/{upload_id}?name={_file_name}.{_file_type}') as response:
+        response.raise_for_status()
+  return True
+
+async def download_file(url, destination):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            with open(destination, 'wb') as fd:
+                while True:
+                    chunk = await resp.content.read(1024)  # 1k chunks
+                    if not chunk:
+                        break
+                    fd.write(chunk)
+    return destination
+
+async def upload_file_by_username(url,file_type, _dest_file_name, _dest_folder_name):
+    # Download the video file
+    file_path = await download_file(url, f"{_dest_file_name}.{file_type}")
+    # Call the upload_large_file function
+    result = await upload_large_file(file_path,file_type, Deta_Project_Id, _dest_folder_name, _dest_file_name)
+     # Delete the downloaded file
+    os.remove(file_path)
+    return result
 
 async def get_all_Post_from_DB(username,_chat_id):
   try:
@@ -33,7 +103,8 @@ async def get_all_Post_from_DB(username,_chat_id):
         try:
           if item["is_video"] is True :
               itemcount = itemcount + 1
-              await send_message_video(item["video_url"],item["caption"], _chat_id)
+              video_file = await get_video_by_shortcode(item["shortcode"],"mp4",username)
+              await send_message_video(video_file,item["caption"], _chat_id)
         except Exception as e:
           await send_error("Error in get_all_Post_from_DB #Loop items - " + str(e) ,_chat_id)
       return "Success"
@@ -69,7 +140,8 @@ async def get_instagram_posts(username, count, RapidAPI_Key):
           if status == 429:
             raise Exception(f"Could not get a successful response given key")
           res_data = await response.text()  # read the response data
-          json_to_base_db(username, res_data)
+          await json_to_base_db(username, res_data)
+          await get_all_media_to_drive(username)
           res_data = json_repair.loads(res_data)
           end_cursor = res_data["end_cursor"]  # update the end cursor value
           has_more = res_data["has_more"]  # update the has more flag
@@ -116,8 +188,7 @@ async def get_instagram_posts_rotateKey(username, count):
       index += 1
   return "Success"
 
-
-def json_to_base_db(username, json_string):
+async def json_to_base_db(username, json_string):
   # Load the JSON data as a Python object
   json_data = json_repair.loads(json_string)
   itercount = 0
@@ -182,11 +253,33 @@ def json_to_base_db(username, json_string):
       "media_count": json_data["count"],
       "Tracking": True
   }
-
   master_db = deta.Base("Instagram_Master")
   master_db.put(master_data)
   return
 
+async def get_all_media_to_drive(username):
+  try:
+    db = deta.Base(username)
+    response = db.fetch({"owner": username})# check if the response has any items
+    itemcount = 0
+    if response.items:
+      # return True if the username exists
+      for item in response.items:
+        try:
+          if item["is_video"] is True :
+              itemcount = itemcount + 1
+              await upload_file_by_username(item["video_url"], "mp4", item["shortcode"], username)
+        except Exception as e:
+          # send_error("Error in get_all_Post_from_DB #Loop items - " + str(e) ,_chat_id)
+          print(e)
+      return "Success"
+    else:
+      # return False if the username does not exist
+      return "No video items"
+  except Exception as e:
+    #await send_error("Error in get_all_Post_from_DB - " + str(e))
+    print(e)
+    return None
 
 async def is_Username_exist(username,_chat_id):
   try:
@@ -235,19 +328,22 @@ def is_Instagram_photo(url):
     # Return False
     return False
 
-async def send_message_video(_video_url,_caption, _chat_id):
-  async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
-    try:
-      message_url = f"{BOT_URL}/sendVideo"
-      payload = {"chat_id": _chat_id, "video": _video_url,"caption":_caption,"supports_streaming":True}
-      async with session.post(message_url, json=payload) as response: # use post method to send message
-        resp = await response.json() # get the response data as JSON
-        return resp
-    except Exception as e:
-      print(e)
-      await send_error("Error in send_message_video - " + str(e) ,_chat_id)
-      return None
-
+async def send_message_video(video_file, _caption, _chat_id):
+    async with aiohttp.ClientSession() as session:
+        try:
+            message_url = f"{BOT_URL}/sendVideo"
+            data = aiohttp.FormData()
+            data.add_field('chat_id', str(_chat_id))
+            data.add_field('caption', _caption)
+            data.add_field('supports_streaming', 'true')
+            data.add_field('video', video_file, filename='video.mp4')
+            async with session.post(message_url, data=data) as response:
+                resp = await response.json()
+                return resp
+        except Exception as e:
+            print(e)
+            await send_error("Error in send_message_video - " + str(e), _chat_id)
+            return None
 
 async def send_message_text(text_message,_chat_id):
     async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
@@ -261,7 +357,7 @@ async def send_message_text(text_message,_chat_id):
                 print(e)
                 return None
 
-async def send_error(_chat_id, error_message):
+async def send_error(error_message,_chat_id):
     async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
             try:
                 message_url = f"{BOT_URL}/sendMessage"
@@ -272,7 +368,6 @@ async def send_error(_chat_id, error_message):
             except Exception as e:
                 print(e)
                 return None
-
 
 async def get_webhook_info():
     """Get the current webhook information from Telegram API"""
@@ -347,7 +442,7 @@ async def http_handler(request: Request, background_tasks: BackgroundTasks):
     except Exception as e:
         print(e)
         return None
-
+    
     if "message" not in incoming_data:
         print(incoming_data)
         return await send_error(None, "Unknown error, lol, handling coming soon")
@@ -389,13 +484,39 @@ async def http_handler(request: Request, background_tasks: BackgroundTasks):
               await send_error(response_text,chat_id)
           else:
             background_tasks.add_task(get_instagram_posts_rotateKey, username=profile_username, count=50)
-            send_message_text(" - User Not Exist in db - Download Task Started ",chat_id)
+            await send_message_text(" - User Not Exist in db - Download Task Started ",chat_id)
             
     else:
         response_text = ("This is not a valid Instagram URL")
         await send_message_text(response_text,chat_id)
     
     return     
+
+@app.get("/uploadfile")
+async def uploadfile(request: Request):
+    url = request.query_params.get("url")
+    file_type = "mp4"
+    filename = "TestFile"
+    username = "Instagram"
+
+    if url and file_type and filename and username:
+        await upload_file_by_username(url, file_type, filename, username)
+        return "success"
+    else:
+        return "Missing parameters in query string"
+
+@app.get("/getvideo")
+async def uploadfile(request: Request):
+    url = request.query_params.get("url")
+    chat_id = "830920940"
+
+    if url and chat_id :
+        #profile_username = is_Instagram_video(url) 
+        video_file = await get_video_by_shortcode("CsySIE4uFz0","mp4","nivetha_vijayy")
+        await send_message_video(video_file,"",chat_id)
+        return "success"
+    else:
+        return "Missing parameters in query string"
 
 if __name__ == '__main__':
     uvicorn.run(app)
