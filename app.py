@@ -6,6 +6,7 @@ from deta import Deta
 import re
 import json_repair
 import uvicorn
+import json
 #Uncomment the below line if it is codespace
 #from dotenv import load_dotenv
 #load_dotenv()
@@ -34,17 +35,8 @@ async def get_video_by_shortcode(_shortcode,_fileType,_username ):
           if resp.status in (200, 206):
               data = await resp.read()
               return data
-              """ stream_reader = resp.content
-              data = await resp.read()
-              # Open the file in binary write mode
-              with open(f'{_shortcode}.{_fileType}', 'wb') as f:
-                  # Write the bytes data to the file
-                  f.write(data)
-              return stream_reader """
           else:
               return None
-
-   
      
 async def upload_large_file(_file_path,_file_type,_project_id,_folder_name,_file_name):
   base_url = f'https://drive.deta.sh/v1/{_project_id}/{_folder_name}'
@@ -104,7 +96,7 @@ async def get_all_Post_from_DB(username,_chat_id):
           if item["is_video"] is True :
               itemcount = itemcount + 1
               video_file = await get_video_by_shortcode(item["shortcode"],"mp4",username)
-              await send_message_video(video_file,item["caption"], _chat_id)
+              await send_message_video(video_file,item["caption"], _chat_id,item["shortcode"],item["height"],item["width"])
         except Exception as e:
           await send_error("Error in get_all_Post_from_DB #Loop items - " + str(e) ,_chat_id)
       return "Success"
@@ -328,7 +320,7 @@ def is_Instagram_photo(url):
     # Return False
     return False
 
-async def send_message_video(video_file, _caption, _chat_id):
+async def send_message_video(video_file, _caption, _chat_id, _fileName,_height,_width):
     async with aiohttp.ClientSession() as session:
         try:
             message_url = f"{BOT_URL}/sendVideo"
@@ -336,7 +328,19 @@ async def send_message_video(video_file, _caption, _chat_id):
             data.add_field('chat_id', str(_chat_id))
             data.add_field('caption', _caption)
             data.add_field('supports_streaming', 'true')
-            data.add_field('video', video_file, filename='video.mp4')
+            data.add_field('video', video_file, filename= _fileName+'.mp4')
+            data.add_field('height', str(_height))
+            data.add_field('width', str(_width))
+            # Create an inline keyboard with a single button
+            keyboard = {
+                "inline_keyboard": [[
+                    {
+                        "text": "Open Post",
+                        "url": "https://www.instagram.com/reel/"+_fileName
+                    }
+                ]]
+            }# Add the keyboard to the form data
+            data.add_field('reply_markup', json.dumps(keyboard))
             async with session.post(message_url, data=data) as response:
                 resp = await response.json()
                 return resp
@@ -513,7 +517,7 @@ async def uploadfile(request: Request):
     if url and chat_id :
         #profile_username = is_Instagram_video(url) 
         video_file = await get_video_by_shortcode("CsySIE4uFz0","mp4","nivetha_vijayy")
-        await send_message_video(video_file,"",chat_id)
+        await send_message_video(video_file,"",chat_id,"CsySIE4uFz0",0,0)
         return "success"
     else:
         return "Missing parameters in query string"
