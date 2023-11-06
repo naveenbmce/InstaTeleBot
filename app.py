@@ -9,8 +9,8 @@ import json_repair
 import uvicorn
 import json
 #Uncomment the below line if it is codespace
-from dotenv import load_dotenv
-load_dotenv()
+#from dotenv import load_dotenv
+#load_dotenv()
 
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
