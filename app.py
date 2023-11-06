@@ -387,8 +387,28 @@ async def get_webhook_info():
             return None
 
 async def get_video_and_send_task(chat_id: str, video_shortcode: str):
-    video_file = await get_video_Exist_DB(video_shortcode)
-    await send_message_video(video_file, "", chat_id)
+  try:
+    db = deta.Base("Instagram_Master")
+    response = db.fetch()# check if the response has any items
+    video_sent = False  # flag to indicate if the video was sent
+    if response.items:
+      # return True if the username exists
+      for item in response.items:
+        video_file = await get_video_by_shortcode(video_shortcode,"mp4",item["username"])
+        if video_file is not None:
+           userdb = deta.Base(item["username"])
+           userdbresponse = userdb.fetch({"shortcode": video_shortcode})
+           for useritem in userdbresponse.items:
+              await send_message_video(video_file,useritem["caption"], chat_id,video_shortcode,useritem["height"],useritem["width"])
+              video_sent = True
+              break
+           if video_sent:
+              break           
+    else:
+      # return False if the username does not exist
+      return False
+  except Exception as e:
+    return None
 
 @app.get("/set_webhook")
 async def url_setter():
