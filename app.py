@@ -386,6 +386,10 @@ async def get_webhook_info():
             print(e)
             return None
 
+async def get_video_and_send_task(chat_id: str, video_shortcode: str):
+    video_file = await get_video_Exist_DB(video_shortcode)
+    await send_message_video(video_file, "", chat_id)
+
 @app.get("/set_webhook")
 async def url_setter():
     """Set the webhook URL for Telegram API"""
@@ -471,8 +475,7 @@ async def http_handler(request: Request, background_tasks: BackgroundTasks):
           video_shortcode = is_Instagram_video(prompt)
           response_text = "This is a video URL - " + video_shortcode
           await send_message_text(response_text,chat_id)
-          video_file = await get_video_Exist_DB(video_shortcode)
-          await send_message_video(video_file,"",chat_id)
+          background_tasks.add_task(get_video_and_send_task, chat_id, video_shortcode)
       elif is_Instagram_photo(prompt):
           photo_shortcode = is_Instagram_photo(prompt)
           response_text = "This is a photo URL - " + photo_shortcode
