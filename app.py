@@ -535,12 +535,16 @@ async def stream_video(data: bytes):
 @app.get("/getvideo")
 async def getvideo(request: Request):
     url = request.query_params.get("url")
-    #url = "CsySIE4uFz0"
-
     if url:
         shortcode = is_Instagram_video(url)
-        video_file = await get_video_Exist_DB(shortcode)
-        return StreamingResponse(stream_video(video_file), media_type="video/mp4")
+        if(shortcode):
+          video_file = await get_video_Exist_DB(shortcode)
+          if(video_file is not None):
+            return StreamingResponse(stream_video(video_file), media_type="video/mp4")
+          else:
+             return "No video found in db!!"
+        else :
+           return "Url is not Valid !! "
     else:
         return "Missing parameters in query string"
 
