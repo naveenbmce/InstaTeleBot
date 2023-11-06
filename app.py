@@ -9,8 +9,8 @@ import json_repair
 import uvicorn
 import json
 #Uncomment the below line if it is codespace
-#from dotenv import load_dotenv
-#load_dotenv()
+from dotenv import load_dotenv
+load_dotenv()
 
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
@@ -471,6 +471,8 @@ async def http_handler(request: Request, background_tasks: BackgroundTasks):
           video_shortcode = is_Instagram_video(prompt)
           response_text = "This is a video URL - " + video_shortcode
           await send_message_text(response_text,chat_id)
+          video_file = await get_video_Exist_DB(video_shortcode)
+          await send_message_video(video_file,"",chat_id)
       elif is_Instagram_photo(prompt):
           photo_shortcode = is_Instagram_photo(prompt)
           response_text = "This is a photo URL - " + photo_shortcode
