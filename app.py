@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import os
-import aiohttp 
+import aiohttp
 from aiohttp import ClientSession
 from deta import Deta
 import re
