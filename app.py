@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi.responses import StreamingResponse
 import os
 import aiohttp 
 from aiohttp import ClientSession
@@ -8,8 +9,8 @@ import json_repair
 import uvicorn
 import json
 #Uncomment the below line if it is codespace
-#from dotenv import load_dotenv
-#load_dotenv()
+from dotenv import load_dotenv
+load_dotenv()
 
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
@@ -509,16 +510,37 @@ async def uploadfile(request: Request):
     else:
         return "Missing parameters in query string"
 
-@app.get("/getvideo")
-async def uploadfile(request: Request):
-    url = request.query_params.get("url")
-    chat_id = "830920940"
+async def get_video_Exist_DB(shortcode):
+  try:
+    db = deta.Base("Instagram_Master")
+    response = db.fetch()# check if the response has any items
+    if response.items:
+      # return True if the username exists
+      for item in response.items:
+        video_file = await get_video_by_shortcode(shortcode,"mp4",item["username"])
+        if video_file is not None:
+           return video_file
+    else:
+      # return False if the username does not exist
+      return False
+  except Exception as e:
+    return None
 
-    if url and chat_id :
-        #profile_username = is_Instagram_video(url) 
-        video_file = await get_video_by_shortcode("CsySIE4uFz0","mp4","nivetha_vijayy")
-        await send_message_video(video_file,"",chat_id,"CsySIE4uFz0",0,0)
-        return "success"
+async def stream_video(data: bytes):
+    # This is an async generator function that yields chunks of the video file
+    chunk_size = 1024 * 1024  # Chunk size of 1MB
+    for i in range(0, len(data), chunk_size):
+        yield data[i : i + chunk_size]
+
+@app.get("/getvideo")
+async def getvideo(request: Request):
+    url = request.query_params.get("url")
+    #url = "CsySIE4uFz0"
+
+    if url:
+        shortcode = is_Instagram_video(url)
+        video_file = await get_video_Exist_DB(shortcode)
+        return StreamingResponse(stream_video(video_file), media_type="video/mp4")
     else:
         return "Missing parameters in query string"
 
