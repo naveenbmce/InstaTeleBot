@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import os
 import aiohttp
-from aiohttp import ClientSession
+from aiohttp import ClientSession, web
 from deta import Deta
 import re
 import json_repair
@@ -180,6 +180,18 @@ async def get_instagram_posts_rotateKey(username, count):
     elif item["is_Primary"] is False:
       index += 1
   return "Success"
+
+async def get_instagram_post_by_shortcode(_shortcode):
+  url = f"https://instagram-bulk-profile-scrapper.p.rapidapi.com/clients/api/ig/media_by_id?shortcode={_shortcode}&response_type=feeds"
+  headers = {
+      'X-RapidAPI-Key': "9695caae8cmsh5842b4bfafdfb1bp1f2bb8jsncb130fa8e8be",
+      'X-RapidAPI-Host': "instagram-bulk-profile-scrapper.p.rapidapi.com"
+  }
+  async with aiohttp.ClientSession() as session:
+      async with session.get(url, headers=headers) as resp:
+        data = await resp.text()
+        print(data)
+        return data
 
 async def json_to_base_db(username, json_string):
   # Load the JSON data as a Python object
@@ -557,6 +569,21 @@ async def stream_video(data: bytes):
     for i in range(0, len(data), chunk_size):
         yield data[i : i + chunk_size]
 
+async def stream_video_from_file(file_path: str):
+    # This is an async generator function that yields chunks of the video file
+    chunk_size = 1024 * 1024  # Chunk size of 1MB
+    # Open the file in binary mode
+    with open(file_path, 'rb') as f:
+        # Read the file in chunks
+        while True:
+            data = f.read(chunk_size)
+            # Check if the file has ended
+            if not data:
+                break
+            # Yield the chunk of data
+            yield data
+
+
 @app.get("/getvideo")
 async def getvideo(request: Request):
     url = request.query_params.get("url")
@@ -567,7 +594,17 @@ async def getvideo(request: Request):
           if(video_file is not None):
             return StreamingResponse(stream_video(video_file), media_type="video/mp4")
           else:
-             return "No video found in db!!"
+             insta_post = await get_instagram_post_by_shortcode(shortcode)
+             json_data = json_repair.loads(insta_post)
+             for item in json_data:
+              for sub_item in item['items']:
+                video_versions = sub_item.get('video_versions', [])
+                for video_version in video_versions:
+                  video_url = video_version.get('url', '')
+             await upload_file_by_username(video_url,"mp4",shortcode,"others")
+             video_file = await get_video_Exist_DB(shortcode)
+             if(video_file is not None):
+               return StreamingResponse(stream_video(video_file), media_type="video/mp4")
         else :
            return "Url is not Valid !! "
     else:
