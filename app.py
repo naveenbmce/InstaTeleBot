@@ -8,6 +8,7 @@ import re
 import json_repair
 import uvicorn
 import json
+import urllib.request
 #Uncomment the below line if it is codespace
 #from dotenv import load_dotenv
 #load_dotenv()
@@ -76,12 +77,20 @@ async def download_file(url, destination):
                     fd.write(chunk)
     return destination
 
+async def download_video(url_link, video_name):
+    urllib.request.urlretrieve (url_link, video_name)
+    return video_name
+
 async def upload_file_by_username(url,file_type, _dest_file_name, _dest_folder_name):
     # Download the video file
-    file_path = await download_file(url, f"{_dest_file_name}.{file_type}")
+    #file_path = await download_file(url, f"{_dest_file_name}.{file_type}")
+    #file_size = os.path.getsize (file_path)
+    #os.remove(file_path)
+    file_path = await download_video(url, f"{_dest_file_name}.{file_type}")
     # Call the upload_large_file function
     result = await upload_large_file(file_path,file_type, Deta_Project_Id, _dest_folder_name, _dest_file_name)
      # Delete the downloaded file
+    
     os.remove(file_path)
     return result
 
