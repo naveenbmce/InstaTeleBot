@@ -404,6 +404,7 @@ async def get_webhook_info():
 
 async def get_video_and_send_task(chat_id: str, video_shortcode: str):
   try:
+    await send_message_text("Background Task Started...",chat_id)
     db = deta.Base("Instagram_Master")
     response = db.fetch()# check if the response has any items
     video_sent = False  # flag to indicate if the video was sent
@@ -415,6 +416,7 @@ async def get_video_and_send_task(chat_id: str, video_shortcode: str):
            userdb = deta.Base(item["username"])
            userdbresponse = userdb.fetch({"shortcode": video_shortcode})
            for useritem in userdbresponse.items:
+              await send_message_text("Sending Video...",chat_id)
               await send_message_video(video_file,useritem["caption"], chat_id,video_shortcode,useritem["height"],useritem["width"])
               video_sent = True
               break
@@ -437,6 +439,7 @@ async def get_video_and_send_task(chat_id: str, video_shortcode: str):
       await send_message_video(video_file,caption, chat_id,video_shortcode,height,width)
       return False
   except Exception as e:
+    await send_error(str(e),chat_id)
     return None
 
 async def get_video_Exist_DB(shortcode):
