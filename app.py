@@ -28,7 +28,7 @@ video_pattern = r"https?://(www\.)?instagram\.com/(tv|reel)/([a-zA-Z0-9_-]+)/?\?
 # Pattern for Instagram photo URL
 photo_pattern = r"https?://(www\.)?instagram\.com/p/([a-zA-Z0-9_-]+)/?\??"
 
-async def get_video_by_shortcode(_shortcode,_fileType,_username ):
+async def get_video_by_shortcode(_shortcode,_fileType,_username):
   base_url = f'https://drive.deta.sh/v1/{Deta_Project_Id}/{_username}'
   headers = {'X-API-Key': Deta_Key}
   async with aiohttp.ClientSession(headers=headers) as session:
@@ -38,7 +38,7 @@ async def get_video_by_shortcode(_shortcode,_fileType,_username ):
               return data
           else:
               return None
-     
+
 async def upload_large_file(_file_path,_file_type,_project_id,_folder_name,_file_name):
   base_url = f'https://drive.deta.sh/v1/{_project_id}/{_folder_name}'
   headers = {'X-API-Key': Deta_Key}
@@ -350,6 +350,10 @@ async def send_message_video(video_file, _caption, _chat_id, _fileName,_height,_
                     {
                         "text": "Open Post",
                         "url": "https://www.instagram.com/reel/"+_fileName
+                    },
+                    {
+                        "text": "download Post",
+                        "url": "https://testwebservice-8vm8.onrender.com/getvideo?url=https://www.instagram.com/reel/"+_fileName
                     }
                 ]]
             }# Add the keyboard to the form data
@@ -416,11 +420,60 @@ async def get_video_and_send_task(chat_id: str, video_shortcode: str):
               break
            if video_sent:
               break           
+    if video_sent is False:
+      # return False if the username does not exist
+      insta_post = await get_instagram_post_by_shortcode(video_shortcode)
+      json_data = json_repair.loads(insta_post)
+      for item in json_data:
+        for sub_item in item['items']:
+          caption = sub_item.get("caption", {}).get("text", "")
+          height = sub_item.get("original_height", "")
+          width = sub_item.get("original_width", "")
+          video_versions = sub_item.get('video_versions', [])
+          for video_version in video_versions:
+            video_url = video_version.get('url', '')
+      await upload_file_by_username(video_url,"mp4",video_shortcode,"others")
+      video_file = await get_video_Exist_DB(video_shortcode)
+      await send_message_video(video_file,caption, chat_id,video_shortcode,height,width)
+      return False
+  except Exception as e:
+    return None
+
+async def get_video_Exist_DB(shortcode):
+  try:
+    db = deta.Base("Instagram_Master")
+    response = db.fetch()# check if the response has any items
+    if response.items:
+      # return True if the username exists
+      for item in response.items:
+        video_file = await get_video_by_shortcode(shortcode,"mp4",item["username"])
+        if video_file is not None:
+           return video_file
     else:
       # return False if the username does not exist
       return False
   except Exception as e:
     return None
+
+async def stream_video(data: bytes):
+    # This is an async generator function that yields chunks of the video file
+    chunk_size = 1024 * 1024  # Chunk size of 1MB
+    for i in range(0, len(data), chunk_size):
+        yield data[i : i + chunk_size]
+
+async def stream_video_from_file(file_path: str):
+    # This is an async generator function that yields chunks of the video file
+    chunk_size = 1024 * 1024  # Chunk size of 1MB
+    # Open the file in binary mode
+    with open(file_path, 'rb') as f:
+        # Read the file in chunks
+        while True:
+            data = f.read(chunk_size)
+            # Check if the file has ended
+            if not data:
+                break
+            # Yield the chunk of data
+            yield data
 
 @app.get("/set_webhook")
 async def url_setter():
@@ -546,43 +599,6 @@ async def uploadfile(request: Request):
         return "success"
     else:
         return "Missing parameters in query string"
-
-async def get_video_Exist_DB(shortcode):
-  try:
-    db = deta.Base("Instagram_Master")
-    response = db.fetch()# check if the response has any items
-    if response.items:
-      # return True if the username exists
-      for item in response.items:
-        video_file = await get_video_by_shortcode(shortcode,"mp4",item["username"])
-        if video_file is not None:
-           return video_file
-    else:
-      # return False if the username does not exist
-      return False
-  except Exception as e:
-    return None
-
-async def stream_video(data: bytes):
-    # This is an async generator function that yields chunks of the video file
-    chunk_size = 1024 * 1024  # Chunk size of 1MB
-    for i in range(0, len(data), chunk_size):
-        yield data[i : i + chunk_size]
-
-async def stream_video_from_file(file_path: str):
-    # This is an async generator function that yields chunks of the video file
-    chunk_size = 1024 * 1024  # Chunk size of 1MB
-    # Open the file in binary mode
-    with open(file_path, 'rb') as f:
-        # Read the file in chunks
-        while True:
-            data = f.read(chunk_size)
-            # Check if the file has ended
-            if not data:
-                break
-            # Yield the chunk of data
-            yield data
-
 
 @app.get("/getvideo")
 async def getvideo(request: Request):
