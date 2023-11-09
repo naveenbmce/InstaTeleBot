@@ -9,6 +9,7 @@ import json_repair
 import uvicorn
 import json
 import urllib.request
+import telegram
 #Uncomment the below line if it is codespace
 #from dotenv import load_dotenv
 #load_dotenv()
@@ -20,7 +21,7 @@ Deta_Key = os.environ["Deta_DB_KEY"]
 deta = Deta(Deta_Key)
 CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
 Deta_Project_Id = os.environ["Deta_Project_Id"]
-
+bot = telegram.Bot(token=BOT_KEY)
 
 # Pattern for Instagram profile URL
 profile_pattern = r"https?://(www\.)?instagram\.com/([a-zA-Z0-9_.]+)/?\??"
@@ -342,6 +343,10 @@ def is_Instagram_photo(url):
     # Return False
     return False
 
+async def send_telegram_video(video_file,_caption, _chat_id, _fileName,_height,_width):
+  await bot.send_video(chat_id = _chat_id, video=video_file,caption = _caption, height = _height,width =_width,supports_streaming=True)
+  return "success"
+
 async def send_message_video(video_file, _caption, _chat_id, _fileName,_height,_width):
     async with aiohttp.ClientSession() as session:
         try:
@@ -426,7 +431,8 @@ async def get_video_and_send_task(chat_id: str, video_shortcode: str):
            userdbresponse = userdb.fetch({"shortcode": video_shortcode})
            for useritem in userdbresponse.items:
               await send_message_text("Sending Video...",chat_id)
-              await send_message_video(video_file,useritem["caption"], chat_id,video_shortcode,useritem["height"],useritem["width"])
+              #await send_message_video(video_file,useritem["caption"], chat_id,video_shortcode,useritem["height"],useritem["width"])
+              await send_telegram_video(video_file,useritem["caption"], chat_id,video_shortcode,useritem["height"],useritem["width"])
               video_sent = True
               break
            if video_sent:
@@ -445,7 +451,8 @@ async def get_video_and_send_task(chat_id: str, video_shortcode: str):
             video_url = video_version.get('url', '')
       await upload_file_by_username(video_url,"mp4",video_shortcode,"others")
       video_file = await get_video_Exist_DB(video_shortcode)
-      await send_message_video(video_file,caption, chat_id,video_shortcode,height,width)
+      #await send_message_video(video_file,caption, chat_id,video_shortcode,height,width)
+      await send_telegram_video(video_file,caption, chat_id,video_shortcode,height,width)
       return False
   except Exception as e:
     await send_error(str(e),chat_id)
