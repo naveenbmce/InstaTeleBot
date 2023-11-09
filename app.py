@@ -344,8 +344,12 @@ def is_Instagram_photo(url):
     return False
 
 async def send_telegram_video(video_file,_caption, _chat_id, _fileName,_height,_width):
-  await bot.send_video(chat_id = _chat_id, video=video_file,caption = _caption, height = _height,width =_width,supports_streaming=True)
-  return "success"
+  try:
+    await bot.send_video(chat_id = _chat_id, video=video_file,caption = _caption, height = _height,width =_width,supports_streaming=True)
+    return "success"
+  except Exception as e:
+    await send_error(str(e),_chat_id)
+    return None
 
 async def send_message_video(video_file, _caption, _chat_id, _fileName,_height,_width):
     async with aiohttp.ClientSession() as session:
@@ -451,6 +455,7 @@ async def get_video_and_send_task(chat_id: str, video_shortcode: str):
             video_url = video_version.get('url', '')
       await upload_file_by_username(video_url,"mp4",video_shortcode,"others")
       video_file = await get_video_Exist_DB(video_shortcode)
+      await send_message_text("Sending Video...",chat_id)
       #await send_message_video(video_file,caption, chat_id,video_shortcode,height,width)
       await send_telegram_video(video_file,caption, chat_id,video_shortcode,height,width)
       return False
