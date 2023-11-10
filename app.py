@@ -10,6 +10,7 @@ import uvicorn
 import json
 import urllib.request
 import telegram
+from pyrogram import Client
 #Uncomment the below line if it is codespace
 #from dotenv import load_dotenv
 #load_dotenv()
@@ -22,6 +23,7 @@ deta = Deta(Deta_Key)
 CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
 Deta_Project_Id = os.environ["Deta_Project_Id"]
 bot = telegram.Bot(token=BOT_KEY)
+pyroapp = Client("my_account")
 
 # Pattern for Instagram profile URL
 profile_pattern = r"https?://(www\.)?instagram\.com/([a-zA-Z0-9_.]+)/?\??"
@@ -420,9 +422,13 @@ async def get_webhook_info():
             print(e)
             return None
 
+async def progress(current, total):
+    print(f"{current * 100 / total:.1f}%")
+
 async def get_video_and_send_task(chat_id: str, video_shortcode: str):
   try:
     await send_message_text("Background Task Started...",chat_id)
+    await app.send_video(830920940, "testing.mp4", progress=progress)
     db = deta.Base("Instagram_Master")
     response = db.fetch()# check if the response has any items
     video_sent = False  # flag to indicate if the video was sent
