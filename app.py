@@ -125,7 +125,7 @@ async def upload_file_by_username(url,file_type, _dest_file_name, _dest_folder_n
     result = await upload_large_file(file_path,file_type, Deta_Project_Id, _dest_folder_name, _dest_file_name)
      # Delete the downloaded file
     
-    os.remove(file_path)
+    #os.remove(file_path)
     return result
 
 # Define a custom progress function
@@ -143,9 +143,9 @@ async def progress(current, total, message, start):
 async def send_telegram_video(video_file,_caption, _chat_id, _fileName,_height,_width):
   try:
     # Create a file-like object from the bytes
-    file = io.BytesIO(video_file)
+    #file = io.BytesIO(video_file)
     # Set the name attribute of the file-like object
-    file.name = _fileName+".mp4"
+    #file.name = _fileName+".mp4"
     # Create the keyboard
     keyboard = InlineKeyboardMarkup([
         [ # Row 1 button
@@ -166,7 +166,7 @@ async def send_telegram_video(video_file,_caption, _chat_id, _fileName,_height,_
         # Get the current time
         start = time.time()
         # Send the video with the custom progress function
-        await pyroapp.send_video(chat_id  = _chat_id, video = file,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress, progress_args=(message, start))
+        await pyroapp.send_video(chat_id  = _chat_id, video = video_file,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress, progress_args=(message, start))
         # Delete the progress message
         await message.delete()
     return "success"
@@ -561,9 +561,11 @@ async def get_video_and_send_task(chat_id: str, video_shortcode: str):
           for video_version in video_versions:
             video_url = video_version.get('url', '')
       await upload_file_by_username(video_url,"mp4",video_shortcode,"others")
-      video_file = await get_video_Exist_DB(video_shortcode)
+      #video_file = await get_video_Exist_DB(video_shortcode)
       #await send_message_video(video_file,caption, chat_id,video_shortcode,height,width)
+      video_file = video_shortcode+".mp4"
       await send_telegram_video(video_file,caption, chat_id,video_shortcode,height,width)
+      os.remove(video_file)
       return False
   except Exception as e:
     await send_error(str(e),chat_id)
