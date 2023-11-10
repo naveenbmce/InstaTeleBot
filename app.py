@@ -165,9 +165,12 @@ async def send_telegram_video(video_file,_caption, _chat_id, _fileName,_height,_
         message = await pyroapp.send_message(chat_id=_chat_id, text="📤 Uploading video...")
         # Get the current time
         start = time.time()
-        # Send the video with the custom progress function
-        await pyroapp.send_video(chat_id  = _chat_id, video = video_file,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress, progress_args=(message, start))
-        # Delete the progress message
+        try:
+          # Send the video with the custom progress function
+            await pyroapp.send_video(chat_id  = _chat_id, video = video_file,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress, progress_args=(message, start))
+          # Delete the progress message
+        except:
+           await pyroapp.send_video(chat_id  = _chat_id, video = video_file)
         await message.delete()
     return "success"
   except Exception as e:
