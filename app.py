@@ -362,7 +362,7 @@ async def send_telegram_video(video_file,_caption, _chat_id, _fileName,_height,_
 
     # Create the keyboard
     keyboard = InlineKeyboardMarkup([
-        [ # Row 1
+        [ # Row 1 button
             InlineKeyboardButton(
                 text="Open Post",
                 url="https://www.instagram.com/reel/"+_fileName
