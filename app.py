@@ -11,6 +11,7 @@ import json
 import urllib.request
 import telegram
 from pyrogram import Client
+import asyncio
 #Uncomment the below line if it is codespace
 #from dotenv import load_dotenv
 #load_dotenv()
@@ -23,7 +24,10 @@ deta = Deta(Deta_Key)
 CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
 Deta_Project_Id = os.environ["Deta_Project_Id"]
 bot = telegram.Bot(token=BOT_KEY)
-pyroapp = Client("my_account")
+#pyroapp = Client("my_account")
+api_id = 1727796
+api_hash = "e291e0f8cc72e1d037b90ba177a70449"
+bot_token = "5636442260:AAHqaWDwBtce9UvM8lQEzhCotkUGRmOgtTw"
 
 # Pattern for Instagram profile URL
 profile_pattern = r"https?://(www\.)?instagram\.com/([a-zA-Z0-9_.]+)/?\??"
@@ -91,7 +95,9 @@ async def upload_file_by_username(url,file_type, _dest_file_name, _dest_folder_n
     #os.remove(file_path)
     file_path = await download_video(url, f"{_dest_file_name}.{file_type}")
     # Call the upload_large_file function
-    await app.send_video(830920940, f"{_dest_file_name}.{file_type}", progress=progress)
+    async with Client("my_account", api_id, api_hash,bot_token=bot_token) as pyroapp:
+        await pyroapp.send_video(830920940, file_path, progress=progress)
+    
     result = await upload_large_file(file_path,file_type, Deta_Project_Id, _dest_folder_name, _dest_file_name)
      # Delete the downloaded file
     
