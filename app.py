@@ -14,6 +14,7 @@ import urllib.request
 from pyrogram import Client
 import asyncio
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+import time
 #Uncomment the below line if it is codespace
 #from dotenv import load_dotenv
 #load_dotenv()
@@ -36,6 +37,30 @@ profile_pattern = r"https?://(www\.)?instagram\.com/([a-zA-Z0-9_.]+)/?\??"
 video_pattern = r"https?://(www\.)?instagram\.com/(tv|reel)/([a-zA-Z0-9_-]+)/?\??"
 # Pattern for Instagram photo URL
 photo_pattern = r"https?://(www\.)?instagram\.com/p/([a-zA-Z0-9_-]+)/?\??"
+
+def format_size(bytes):
+    # Define the step to convert bytes to higher units
+    step = 1024
+
+    # Convert bytes to KB
+    kb = bytes / step
+
+    # Check if the value is less than one KB
+    if kb < 1:
+        # Return the value in bytes with one decimal place
+        return f"{bytes:.1f} bytes"
+    else:
+        # Convert KB to MB
+        mb = kb / step
+
+        # Check if the value is less than one MB
+        if mb < 1:
+            # Return the value in KB with one decimal place
+            return f"{kb:.1f} KB"
+        else:
+            # Return the value in MB with one decimal place
+            return f"{mb:.1f} MB"
+
 
 async def get_video_by_shortcode(_shortcode,_fileType,_username):
   base_url = f'https://drive.deta.sh/v1/{Deta_Project_Id}/{_username}'
@@ -97,12 +122,57 @@ async def upload_file_by_username(url,file_type, _dest_file_name, _dest_folder_n
     file_path = await download_video(url, f"{_dest_file_name}.{file_type}")
     # Call the upload_large_file function
     
-    
     result = await upload_large_file(file_path,file_type, Deta_Project_Id, _dest_folder_name, _dest_file_name)
      # Delete the downloaded file
     
     os.remove(file_path)
     return result
+
+# Define a custom progress function
+async def progress(current, total, message, start):
+    # Calculate the percentage and the elapsed time
+    percentage = current * 100 / total
+    elapsed_time = round(time.time() - start)
+
+    # Format the progress message
+    progress_message = f"📤 Uploading video...\n\n▪️ Progress: {percentage:.1f}%\n▪️ Speed: {format_size(current / elapsed_time)}/s\n▪️ ETA: {round((total - current) / (current / elapsed_time))} seconds"
+
+    # Edit the message with the progress message
+    await message.edit(progress_message)
+
+async def send_telegram_video(video_file,_caption, _chat_id, _fileName,_height,_width):
+  try:
+    # Create a file-like object from the bytes
+    file = io.BytesIO(video_file)
+    # Set the name attribute of the file-like object
+    file.name = _fileName+".mp4"
+    # Create the keyboard
+    keyboard = InlineKeyboardMarkup([
+        [ # Row 1 button
+            InlineKeyboardButton(
+                text="Open Post",
+                url="https://www.instagram.com/reel/"+_fileName
+            ),
+            InlineKeyboardButton(
+                text="Download Post",
+                url="https://testwebservice-8vm8.onrender.com/getvideo?url=https://www.instagram.com/reel/"+_fileName
+            )
+        ]
+    ])
+    #await bot.send_video(chat_id = _chat_id, video=video_file,caption = _caption, height = _height,width =_width,supports_streaming=True)
+    async with Client("my_account", api_id, api_hash,bot_token=bot_token) as pyroapp:
+        # Send a message to indicate the start of the upload
+        message = await pyroapp.send_message(chat_id=_chat_id, text="📤 Uploading video...")
+        # Get the current time
+        start = time.time()
+        # Send the video with the custom progress function
+        await pyroapp.send_video(chat_id  = _chat_id, video = file,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress, progress_args=(message, start))
+        # Delete the progress message
+        await message.delete()
+    return "success"
+  except Exception as e:
+    await send_error(str(e),_chat_id)
+    return None
 
 async def get_all_Post_from_DB(username,_chat_id):
   try:
@@ -116,7 +186,7 @@ async def get_all_Post_from_DB(username,_chat_id):
           if item["is_video"] is True :
               itemcount = itemcount + 1
               video_file = await get_video_by_shortcode(item["shortcode"],"mp4",username)
-              await send_message_video(video_file,item["caption"], _chat_id,item["shortcode"],item["height"],item["width"])
+              await send_telegram_video(video_file,item["caption"], _chat_id,item["shortcode"],item["height"],item["width"])
         except Exception as e:
           await send_error("Error in get_all_Post_from_DB #Loop items - " + str(e) ,_chat_id)
       return "Success"
@@ -294,14 +364,14 @@ async def get_all_media_to_drive(username):
               itemcount = itemcount + 1
               await upload_file_by_username(item["video_url"], "mp4", item["shortcode"], username)
         except Exception as e:
-          # send_error("Error in get_all_Post_from_DB #Loop items - " + str(e) ,_chat_id)
+          # send_error("Error in get_all_media_to_drive #Loop items - " + str(e) ,_chat_id)
           print(e)
       return "Success"
     else:
       # return False if the username does not exist
       return "No video items"
   except Exception as e:
-    #await send_error("Error in get_all_Post_from_DB - " + str(e))
+    #await send_error("Error in get_all_media_to_drive - " + str(e))
     print(e)
     return None
 
@@ -352,35 +422,6 @@ def is_Instagram_photo(url):
     # Return False
     return False
 
-async def send_telegram_video(video_file,_caption, _chat_id, _fileName,_height,_width):
-  try:
-    # Create a file-like object from the bytes
-    file = io.BytesIO(video_file)
-
-    # Set the name attribute of the file-like object
-    file.name = _fileName+".mp4"
-
-    # Create the keyboard
-    keyboard = InlineKeyboardMarkup([
-        [ # Row 1 button
-            InlineKeyboardButton(
-                text="Open Post",
-                url="https://www.instagram.com/reel/"+_fileName
-            ),
-            InlineKeyboardButton(
-                text="Download Post",
-                url="https://testwebservice-8vm8.onrender.com/getvideo?url=https://www.instagram.com/reel/"+_fileName
-            )
-        ]
-    ])
-    #await bot.send_video(chat_id = _chat_id, video=video_file,caption = _caption, height = _height,width =_width,supports_streaming=True)
-    async with Client("my_account", api_id, api_hash,bot_token=bot_token) as pyroapp:
-        await pyroapp.send_video(chat_id  = _chat_id, video = file,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress)
-    return "success"
-  except Exception as e:
-    await send_error(str(e),_chat_id)
-    return None
-
 async def send_message_video(video_file, _caption, _chat_id, _fileName,_height,_width):
     async with aiohttp.ClientSession() as session:
         try:
@@ -414,7 +455,7 @@ async def send_message_video(video_file, _caption, _chat_id, _fileName,_height,_
             await send_error("Error in send_message_video - " + str(e), _chat_id)
             return None
 
-async def send_message_text(text_message,_chat_id):
+async def send_message_text_old(text_message,_chat_id):
     async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
             try:
                 message_url = f"{BOT_URL}/sendMessage"
@@ -425,6 +466,29 @@ async def send_message_text(text_message,_chat_id):
             except Exception as e:
                 print(e)
                 return None
+            
+async def send_message_text(text_message,_chat_id):
+  try:
+    async with Client("my_account", api_id, api_hash,bot_token=bot_token) as pyroapp:
+      # Send a message to indicate the start of the upload
+      message = await pyroapp.send_message(chat_id=_chat_id, text=text_message)
+      return message
+  except Exception as e:
+      print(e)
+      await send_error("Error in send_message_video - " + str(e), _chat_id)
+      return None
+  
+async def delete_message(message):
+  try:
+     with Client("my_account", api_id, api_hash,bot_token=bot_token) as pyroapp:
+      # Send a message to indicate the start of the upload
+      # Delete the download message
+      await message.delete()
+      return "success"
+  except Exception as e:
+      print(e)
+      return None
+  
 
 async def send_error(error_message,_chat_id):
     async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
@@ -450,8 +514,17 @@ async def get_webhook_info():
             print(e)
             return None
 
-async def progress(current, total):
-    print(f"{current * 100 / total:.1f}%")
+# Define a custom progress function
+async def progress(current, total, message, start):
+    # Calculate the percentage and the elapsed time
+    percentage = current * 100 / total
+    elapsed_time = round(time.time() - start)
+
+    # Format the progress message
+    progress_message = f"📤 Uploading video...\n\n▪️ Progress: {percentage:.1f}%\n▪️ Speed: {format_size(current / elapsed_time)}/s\n▪️ ETA: {round((total - current) / (current / elapsed_time))} seconds"
+
+    # Edit the message with the progress message
+    await message.edit(progress_message)
 
 async def get_video_and_send_task(chat_id: str, video_shortcode: str):
   try:
@@ -468,7 +541,7 @@ async def get_video_and_send_task(chat_id: str, video_shortcode: str):
            userdb = deta.Base(item["username"])
            userdbresponse = userdb.fetch({"shortcode": video_shortcode})
            for useritem in userdbresponse.items:
-              await send_message_text("Sending Video...",chat_id)
+              await send_message_text("📥 Downloading Post...",chat_id)
               #await send_message_video(video_file,useritem["caption"], chat_id,video_shortcode,useritem["height"],useritem["width"])
               await send_telegram_video(video_file,useritem["caption"], chat_id,video_shortcode,useritem["height"],useritem["width"])
               video_sent = True
@@ -489,7 +562,6 @@ async def get_video_and_send_task(chat_id: str, video_shortcode: str):
             video_url = video_version.get('url', '')
       await upload_file_by_username(video_url,"mp4",video_shortcode,"others")
       video_file = await get_video_Exist_DB(video_shortcode)
-      await send_message_text("Sending Video...",chat_id)
       #await send_message_video(video_file,caption, chat_id,video_shortcode,height,width)
       await send_telegram_video(video_file,caption, chat_id,video_shortcode,height,width)
       return False
