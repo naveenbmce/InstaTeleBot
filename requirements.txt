@@ -6,6 +6,6 @@ uvicorn==0.21.1
 instaloader
 json_repair
 aiohttp
-python-telegram-bot
+#python-telegram-bot
 pyrogram
 tgcrypto

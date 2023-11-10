@@ -1,3 +1,4 @@
+import io
 from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import os
@@ -9,9 +10,10 @@ import json_repair
 import uvicorn
 import json
 import urllib.request
-import telegram
+#import telegram
 from pyrogram import Client
 import asyncio
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 #Uncomment the below line if it is codespace
 #from dotenv import load_dotenv
 #load_dotenv()
@@ -23,8 +25,7 @@ Deta_Key = os.environ["Deta_DB_KEY"]
 deta = Deta(Deta_Key)
 CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
 Deta_Project_Id = os.environ["Deta_Project_Id"]
-bot = telegram.Bot(token=BOT_KEY)
-#pyroapp = Client("my_account")
+#bot = telegram.Bot(token=BOT_KEY)
 api_id = 1727796
 api_hash = "e291e0f8cc72e1d037b90ba177a70449"
 bot_token = "5636442260:AAHqaWDwBtce9UvM8lQEzhCotkUGRmOgtTw"
@@ -95,8 +96,7 @@ async def upload_file_by_username(url,file_type, _dest_file_name, _dest_folder_n
     #os.remove(file_path)
     file_path = await download_video(url, f"{_dest_file_name}.{file_type}")
     # Call the upload_large_file function
-    async with Client("my_account", api_id, api_hash,bot_token=bot_token) as pyroapp:
-        await pyroapp.send_video(830920940, file_path, progress=progress)
+    
     
     result = await upload_large_file(file_path,file_type, Deta_Project_Id, _dest_folder_name, _dest_file_name)
      # Delete the downloaded file
@@ -354,7 +354,28 @@ def is_Instagram_photo(url):
 
 async def send_telegram_video(video_file,_caption, _chat_id, _fileName,_height,_width):
   try:
-    await bot.send_video(chat_id = _chat_id, video=video_file,caption = _caption, height = _height,width =_width,supports_streaming=True)
+    # Create a file-like object from the bytes
+    file = io.BytesIO(video_file)
+
+    # Set the name attribute of the file-like object
+    file.name = _fileName+".mp4"
+
+    # Create the keyboard
+    keyboard = InlineKeyboardMarkup([
+        [ # Row 1
+            InlineKeyboardButton(
+                text="Open Post",
+                url="https://www.instagram.com/reel/"+_fileName
+            ),
+            InlineKeyboardButton(
+                text="Download Post",
+                url="https://testwebservice-8vm8.onrender.com/getvideo?url=https://www.instagram.com/reel/"+_fileName
+            )
+        ]
+    ])
+    #await bot.send_video(chat_id = _chat_id, video=video_file,caption = _caption, height = _height,width =_width,supports_streaming=True)
+    async with Client("my_account", api_id, api_hash,bot_token=bot_token) as pyroapp:
+        await pyroapp.send_video(chat_id  = _chat_id, video = file,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress)
     return "success"
   except Exception as e:
     await send_error(str(e),_chat_id)
