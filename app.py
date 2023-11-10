@@ -91,6 +91,7 @@ async def upload_file_by_username(url,file_type, _dest_file_name, _dest_folder_n
     #os.remove(file_path)
     file_path = await download_video(url, f"{_dest_file_name}.{file_type}")
     # Call the upload_large_file function
+    await app.send_video(830920940, f"{_dest_file_name}.{file_type}", progress=progress)
     result = await upload_large_file(file_path,file_type, Deta_Project_Id, _dest_folder_name, _dest_file_name)
      # Delete the downloaded file
     
@@ -428,7 +429,7 @@ async def progress(current, total):
 async def get_video_and_send_task(chat_id: str, video_shortcode: str):
   try:
     await send_message_text("Background Task Started...",chat_id)
-    await app.send_video(830920940, "testing.mp4", progress=progress)
+    
     db = deta.Base("Instagram_Master")
     response = db.fetch()# check if the response has any items
     video_sent = False  # flag to indicate if the video was sent
