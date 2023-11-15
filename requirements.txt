@@ -9,3 +9,4 @@ aiohttp
 #python-telegram-bot
 pyrogram
 tgcrypto
+python-dotenv
