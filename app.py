@@ -16,8 +16,8 @@ import asyncio
 from pyrogram.types import InlineKeyboardMarkup,InlineKeyboardButton,InputMediaPhoto,InputMediaVideo
 import time
 #Uncomment the below line if it is codespace
-from dotenv import load_dotenv
-load_dotenv()
+#from dotenv import load_dotenv
+#load_dotenv()
 
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
@@ -129,7 +129,6 @@ async def download_video(url_link, video_name):
       print(str(e))
       return None
 
-
 async def upload_file_by_username(url,file_type, _dest_file_name, _dest_folder_name):
     # Download the video file
     #file_path = await download_file(url, f"{_dest_file_name}.{file_type}")
@@ -140,9 +139,7 @@ async def upload_file_by_username(url,file_type, _dest_file_name, _dest_folder_n
     if file_path is not None:
       result = await upload_large_file(file_path,file_type, Deta_Project_Id, _dest_folder_name, _dest_file_name)
 
-    
-     # Delete the downloaded file
-    
+    # Delete the downloaded file
     #os.remove(file_path)
     return file_path
 
@@ -183,14 +180,17 @@ async def send_telegram_media(file_name,_caption, _chat_id, _fileName,_height,_w
         try:
             if extension == ".mp4":
             # Send the video with the custom progress function
-              await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress, progress_args=(message, start))
+              #await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress, progress_args=(message, start))
+              await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard)
             elif extension == ".jpg":
-              await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard, progress=progress, progress_args=(message, start))
+              #await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard, progress=progress, progress_args=(message, start))
+              await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard)
         except:
+          time.sleep(5)
           if extension == ".mp4":
             await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard)
           elif extension == ".jpg":
-             await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard)
+            await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard)
         finally:
             #os.remove(file_name)
             await message.delete()
@@ -221,7 +221,8 @@ async def send_telegram_photo(photo_file_path,_caption, _chat_id, _fileName):
         start = time.time()
         try:
           # Send the video with the custom progress function
-            await pyroapp.send_photo(chat_id  = _chat_id, photo = photo_file_path,caption = _caption,reply_markup=keyboard, progress=progress, progress_args=(message, start))
+            #await pyroapp.send_photo(chat_id  = _chat_id, photo = photo_file_path,caption = _caption,reply_markup=keyboard, progress=progress, progress_args=(message, start))
+            await pyroapp.send_photo(chat_id  = _chat_id, photo = photo_file_path,caption = _caption,reply_markup=keyboard)
           # Delete the progress message
         except:
            await pyroapp.send_photo(chat_id  = _chat_id, photo = photo_file_path,caption = _caption,reply_markup=keyboard)
@@ -305,7 +306,7 @@ async def get_all_Post_from_DB(username,_chat_id):
     await send_error("Error in get_all_Post_from_DB - " + str(e) ,_chat_id)
     return None
 
-async def get_instagram_posts(username, count, RapidAPI_Key):
+async def get_instagram_posts(username, count, RapidAPI_Key,_chat_id):
   try:
     headers = {
         'X-RapidAPI-Key': RapidAPI_Key,
@@ -330,8 +331,8 @@ async def get_instagram_posts(username, count, RapidAPI_Key):
           if status == 429:
             raise Exception(f"Could not get a successful response given key")
           res_data = await response.text()  # read the response data
-          await json_to_base_db(username, res_data)
-          await get_all_media_to_drive(username)
+          await json_to_base_db(username, res_data,_chat_id)
+          #await get_all_media_to_drive(username)
           res_data = json_repair.loads(res_data)
           end_cursor = res_data["end_cursor"]  # update the end cursor value
           has_more = res_data["has_more"]  # update the has more flag
@@ -340,7 +341,7 @@ async def get_instagram_posts(username, count, RapidAPI_Key):
 
   return data  # return the data list
 
-async def get_instagram_posts_rotateKey(username, count):
+async def get_all_instagram_posts_rotateKey(username, count,_chat_id):
   rapid_db = deta.Base("Rapid_API_Keys")
   response = rapid_db.fetch({"api_name": "Instagram-Data"})
   items = response.items  # get the list of items from the response
@@ -351,25 +352,60 @@ async def get_instagram_posts_rotateKey(username, count):
     if item["is_Primary"] is True:  # if the item is primary, use its key
       try:
         print("Function get_instagram_posts")
-        await get_instagram_posts(username, count, item["key"])  # call the get_instagram_posts function with the key and store the data
+        await get_instagram_posts(username, count, item["key"],_chat_id)  # call the get_instagram_posts function with the key and store the data
         success = True  # set the success flag to True
         break  # break out of the loop
       except Exception as e:  # if there is an exception, handle it
         print(e)
-        rapid_db.put(data={
+        rapid_db.update({
             "key": item["key"],
-            "api_name": "Instagram-Data",
             "is_Primary": False
-        })  # update the primary flag to False in the database
+        })
+       # update the primary flag to False in the database
         index += 1  # increment the index by 1
         if index < len(
             items
         ):  # if there is a next item in the list, update its primary flag to True in the database
           next_item = items[index]
-          rapid_db.put(
-              data={
+          rapid_db.update({
                   "key": next_item["key"],
-                  "api_name": "Instagram-Data",
+                  "is_Primary": True
+              })
+          response = rapid_db.fetch({"api_name": "Instagram-Data"})
+          items = response.items
+    elif item["is_Primary"] is False:
+      index += 1
+  return "Success"
+
+async def get_new_instagram_posts_rotateKey(username, count,_chat_id):
+  rapid_db = deta.Base("Rapid_API_Keys")
+  response = rapid_db.fetch({"api_name": "Instagram-Data"})
+  items = response.items  # get the list of items from the response
+  index = 0  # initialize a variable to store the key index
+  success = False  # initialize a variable to store the success flag
+  while not success and index < len(items):  # loop until success or no more keys left
+    item = items[index]  # get the current item from the list
+    if item["is_Primary"] is True:  # if the item is primary, use its key
+      try:
+        print("Function get_new_instagram_posts")
+        newpost = await get_instagram_newpost_by_username(username)  # call the get_instagram_posts function with the key and store the data
+        
+        success = True  # set the success flag to True
+        break  # break out of the loop
+      except Exception as e:  # if there is an exception, handle it
+        print(e)
+        rapid_db.update({
+            "key": item["key"],
+            "is_Primary": False
+        })
+       # update the primary flag to False in the database
+        index += 1  # increment the index by 1
+        if index < len(
+            items
+        ):  # if there is a next item in the list, update its primary flag to True in the database
+          next_item = items[index]
+          rapid_db.update({
+                  "key": next_item["key"],
                   "is_Primary": True
               })
           response = rapid_db.fetch({"api_name": "Instagram-Data"})
@@ -394,8 +430,23 @@ async def get_instagram_post_by_shortcode(_shortcode):
            return data
         else :
           return None
+        
+async def get_instagram_newpost_by_username(username):
+  url = f"https://instagram-bulk-profile-scrapper.p.rapidapi.com/clients/api/ig/ig_profile?ig={username}&response_type=feeds"
+  headers = {
+      'X-RapidAPI-Key': "210233aecbmsh61a7cefbf2c880cp18192cjsnfa3cbdb526ff",
+      'X-RapidAPI-Host': "instagram-bulk-profile-scrapper.p.rapidapi.com"
+  }
+  async with aiohttp.ClientSession() as session:
+      async with session.get(url, headers=headers) as resp:
+        data = await resp.text()
+        print(data)
+        if resp.status == 200:
+           return data
+        else :
+          return None
 
-async def json_to_base_db(username, json_string):
+async def json_to_base_db(username, json_string,_chat_id):
   # Load the JSON data as a Python object
   json_data = json_repair.loads(json_string)
   itercount = 0
@@ -410,7 +461,7 @@ async def json_to_base_db(username, json_string):
       owner = item.get("owner", {}).get("username", "")
       item_type = item.get("type", "")
       is_video = item.get("is_video", "")
-      media_url = item.get("media_url", "") if is_video else ""
+      media_url = item.get("video_url", "") if is_video else item.get("display_url", "")
       height = item.get("dimension", {}).get("height", "")
       width = item.get("dimension", {}).get("width", "")
       thumbnail_src = item.get("thumbnail_src", "")
@@ -426,34 +477,31 @@ async def json_to_base_db(username, json_string):
           item.get("hashtags",[])) if "hashtags" in item and item.get("hashtags") else ""
       mentions = ",".join(
           item.get("mentions",[])) if "mentions" in item and item.get("mentions") else ""
+      media_objects = []
+      media_object = {
+                    'media_type': 'video' if is_video else 'image',
+                    'url': media_url,
+                    'short_code': shortcode,
+                    'height': height,
+                    'width': width
+                }
+      # Add the object to the list
+      media_objects.append(media_object)
       # Create a dictionary with the key and other fields
-      data = {
-          "key": id,
-          "owner_id": owner_id,
-          "owner": owner,
-          "type": item_type,
-          "is_video": is_video,
-          "media_url": media_url,
-          "height": height,
-          "width": width,
-          "thumbnail_src": thumbnail_src,
-          "taken_at_timestamp": taken_at_timestamp,
-          "shortcode": shortcode,
-          "caption": caption,
-          "comments": comments,
-          "likes": likes,
-          "views": views,
-          "location": location,
-          "hashtags": hashtags,
-          "mentions": mentions
-      }
+      deta_put_instagram(username=username,key_id=id,owner_id=owner_id,item_type=item_type,is_video=is_video,media_url=media_objects,
+                            thumbnail_src=thumbnail_src,taken_at_timestamp=taken_at_timestamp,shortcode=shortcode,
+                            caption=caption,comments=comments,likes=likes,views=views,location=location,hashtags=hashtags,mentions=mentions)
+      if is_video:
+        media_file_name = await upload_file_by_username(media_url, "mp4", shortcode, username)
+      else:
+         media_file_name = await upload_file_by_username(media_url, "jpg", shortcode, username)
+      await send_telegram_media(media_file_name,caption, _chat_id,shortcode,height,width)
+      os.remove(media_file_name)
+      time.sleep(5)
+                             
     except Exception as e:
       print(e)
       continue
-    # Use the put() method to store the data in the Base
-    db = deta.Base(username)
-    db.put(data)
-
   master_data = {
       "key": json_data["id"],
       "username": username,
@@ -638,7 +686,7 @@ async def progress(current, total, message, start):
     # Edit the message with the progress message
     await message.edit(progress_message)
 
-async def get_video_and_send_task(chat_id: str, video_shortcode: str):
+""" async def get_video_and_send_task(chat_id: str, video_shortcode: str):
   try:
     startmessage = await send_message_text("📥 Downloading Post...",chat_id)
     db = deta.Base("Instagram_Master")
@@ -718,6 +766,7 @@ async def get_video_and_send_task(chat_id: str, video_shortcode: str):
   finally:
      os.remove(video_file)
      await delete_message(chat_id,startmessage)
+ """
 
 async def instagram_post_handler(chat_id: str, req_shortcode: str):
   try:
@@ -865,7 +914,6 @@ async def instagram_post_handler(chat_id: str, req_shortcode: str):
      for filename in media_list:
       os.remove(filename)
      #await delete_message(chat_id,startmessage)
-
 
 def deta_put_instagram(username,key_id,owner_id,item_type,is_video,media_url,thumbnail_src,taken_at_timestamp,shortcode,
                        caption,comments,likes,views,location,hashtags,mentions ):
@@ -1033,7 +1081,7 @@ async def http_handler(request: Request, background_tasks: BackgroundTasks):
             except Exception as e:
               await send_error(response_text,chat_id)
           else:
-            background_tasks.add_task(get_instagram_posts_rotateKey, username=profile_username, count=50)
+            background_tasks.add_task(get_all_instagram_posts_rotateKey, username=profile_username, count=50,_chat_id=chat_id)
             await send_message_text(" - User Not Exist in db - Download Task Started ",chat_id)
             
     else:
