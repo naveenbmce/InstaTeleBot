@@ -1062,15 +1062,29 @@ def SaveKey():
   rapid_db = deta.Base("Rapid_API_Keys")
   rapid_db.put(data = {
     "key": "210233aecbmsh61a7cefbf2c880cp18192cjsnfa3cbdb526ff",
+    "Account":"johnnikki272@gmail.com",
+    "Rapid-api_Name":"IG Data,Instagram Bulk Profile Scrapper",
     "api_name": "Instagram-Data",
     "is_Primary" : True})
   rapid_db.put(data = {
     "key": "90fe634f95mshab51bdbbb21aab9p16e278jsndb3368361c77",
+    "Account":"johnnikki271@gmail.com",
+    "Rapid-api_Name":"IG Data,Instagram Bulk Profile Scrapper",
     "api_name": "Instagram-Data",
     "is_Primary" : False})
   rapid_db.put(
       data={
           "key": "9695caae8cmsh5842b4bfafdfb1bp1f2bb8jsncb130fa8e8be",
+          "Account":"johnnikki271@outlook.com",
+          "Rapid-api_Name":"IG Data,Instagram Bulk Profile Scrapper",
+          "api_name": "Instagram-Data",
+          "is_Primary": False
+      })
+  rapid_db.put(
+      data={
+          "key": "9fc5d92744mshc1c1266651fa9b9p117e6djsna8fa34ea259b",
+          "Account":"johnnikki272@outlook.com",
+          "Rapid-api_Name":"IG Data,Instagram Bulk Profile Scrapper",
           "api_name": "Instagram-Data",
           "is_Primary": False
       })
