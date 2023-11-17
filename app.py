@@ -291,11 +291,24 @@ async def get_all_Post_from_DB(username,_chat_id):
     if response.items:
       # return True if the username exists
       for item in response.items:
+        media_items = item.get('media_url')
+        for media_item in media_items:
+          media_shortcode = media_item.get('short_code')
+          media_type = media_item.get('media_type')
+          original_height = media_item.get('height')
+          original_width = media_item.get('width') 
+          caption = item["caption"]
         try:
-          if item["is_video"] is True :
-              itemcount = itemcount + 1
-              video_file = await get_post_by_shortcode(item["shortcode"],"mp4",username)
-              await send_telegram_media(video_file,item["caption"], _chat_id,item["shortcode"],item["height"],item["width"])
+          file_extension = 'mp4' if media_type == 'video' else 'jpg'
+          itemcount = itemcount + 1
+          video_data = await get_post_by_shortcode(media_shortcode,file_extension,username)
+          media_filename = f'{media_shortcode}.{file_extension}'
+          with open(media_filename, 'wb') as file: # open a file with the same name and type as the video
+            file.write(video_data)
+
+          await send_telegram_media(media_filename,caption[:1024], _chat_id,media_shortcode,original_height,original_width)
+          os.remove(media_filename)
+          time.sleep(3)
         except Exception as e:
           await send_error("Error in get_all_Post_from_DB #Loop items - " + str(e) ,_chat_id)
       return "Success"
@@ -306,7 +319,7 @@ async def get_all_Post_from_DB(username,_chat_id):
     await send_error("Error in get_all_Post_from_DB - " + str(e) ,_chat_id)
     return None
 
-async def get_instagram_posts(username, count, RapidAPI_Key,_chat_id):
+async def get_all_instagram_posts(username, count, RapidAPI_Key,_chat_id):
   try:
     headers = {
         'X-RapidAPI-Key': RapidAPI_Key,
@@ -352,7 +365,8 @@ async def get_all_instagram_posts_rotateKey(username, count,_chat_id):
     if item["is_Primary"] is True:  # if the item is primary, use its key
       try:
         print("Function get_instagram_posts")
-        await get_instagram_posts(username, count, item["key"],_chat_id)  # call the get_instagram_posts function with the key and store the data
+        await get_all_instagram_posts(username, count, item["key"],_chat_id)  # call the get_instagram_posts function with the key and store the data
+        await get_all_Post_from_DB(username, _chat_id)
         success = True  # set the success flag to True
         break  # break out of the loop
       except Exception as e:  # if there is an exception, handle it
@@ -377,7 +391,7 @@ async def get_all_instagram_posts_rotateKey(username, count,_chat_id):
       index += 1
   return "Success"
 
-async def get_new_instagram_posts_rotateKey(username, count,_chat_id):
+async def get_new_instagram_posts_rotateKey(username):
   rapid_db = deta.Base("Rapid_API_Keys")
   response = rapid_db.fetch({"api_name": "Instagram-Data"})
   items = response.items  # get the list of items from the response
@@ -389,8 +403,9 @@ async def get_new_instagram_posts_rotateKey(username, count,_chat_id):
       try:
         print("Function get_new_instagram_posts")
         newpost = await get_instagram_newpost_by_username(username)  # call the get_instagram_posts function with the key and store the data
-        
+        json_data = json_repair.loads(newpost)
         success = True  # set the success flag to True
+        return json_data
         break  # break out of the loop
       except Exception as e:  # if there is an exception, handle it
         print(e)
@@ -413,6 +428,120 @@ async def get_new_instagram_posts_rotateKey(username, count,_chat_id):
     elif item["is_Primary"] is False:
       index += 1
   return "Success"
+
+async def get_update_post_handler():
+  try:
+    db = deta.Base("Instagram_Master")
+    response = db.fetch()# check if the response has any items
+    if response.items:
+      # return True if the username exists
+      for item in response.items:
+        media_list =[]
+        media_objects = []
+        if item["username"] != "others" and item["Tracking"] == True:
+           chat_ids = list(filter(None, str(item["chat_id"]).split(';')))
+           newpostresponse = await get_new_instagram_posts_rotateKey(item["username"])
+           if newpostresponse:
+            newposts = newpostresponse[0].get('feed',{}).get('data',[])
+            for sub_item in newposts:
+              post_shortcode = sub_item.get('code')
+              ispostExist = await get_post_details_by_shortcode(post_shortcode,item["username"])
+              if ispostExist is None:
+                id = sub_item.get("id", "")
+                username = sub_item.get("user", {}).get("username", "")
+                owner_id = sub_item.get("user", {}).get("pk", "")
+                original_height = sub_item.get("original_height", "")
+                original_width = sub_item.get("original_width", "")
+                caption = sub_item.get("caption", {}).get("text", "")
+                product_type = sub_item.get("product_type", "")
+                if product_type == "clips":
+                  is_video = True
+                else:
+                  is_video = False
+                shortcode = sub_item.get("code", "")
+                taken_at_timestamp = sub_item.get("taken_at", "")
+                comments = sub_item.get("comment_count", "")
+                likes = sub_item.get("like_count", "")
+                views = sub_item.get("view_count", "")
+                location = sub_item.get("location", {}).get("name", "")
+                thumbnail_src = ""
+                hashtags = ""
+                mentions = ""
+                video_versions = sub_item.get('video_versions', [])
+                if(len(video_versions) >= 1):
+                  media_candidates = video_versions
+                else:
+                  image_versions = sub_item.get('image_versions2', {})
+                  media_candidates = image_versions.get('candidates', [])
+                
+                for carousel in sub_item.get('carousel_media', []):
+                    # Get the list of candidates
+                    candidates = carousel.get('image_versions2', {}).get('candidates', [])
+                    # Get the last candidate (1080p image)
+                    last_candidate = candidates[-1] if candidates else {}
+                    # Get the URL of the image
+                    image_url = last_candidate.get('url', '')
+                    height = last_candidate.get('height', '')
+                    width = last_candidate.get('width', '')
+                    # Create an object with media type and URL
+                    if image_url :
+                      media_object = {
+                          'media_type': 'image' if carousel.get('media_type') == 1 else 'video',
+                          'url': image_url,
+                          'short_code': carousel.get('shortcode'),
+                          'height': height,
+                          'width': width
+                      }
+                      # Add the object to the list
+                      media_objects.append(media_object)
+
+                if not media_objects:
+                  last_candidate = media_candidates[-1]
+                  image_url = last_candidate.get('url', '')
+                  print(image_url)
+                  media_object = {
+                          'media_type': 'image' if sub_item.get('media_type') == 1 else 'video',
+                          'url': image_url,
+                          'short_code': sub_item.get("code", ""),
+                          'height': sub_item.get("original_height", ""),
+                          'width': sub_item.get("original_width", "")
+                      }
+                  media_objects.append(media_object)
+                
+                if(len(media_objects) > 1):
+                      item_type = "GraphSidecar"
+                elif media_objects[0].get('media_type') == "image":
+                      item_type = "GraphImage"
+                elif media_objects[0].get('media_type') == "video":
+                      item_type = "GraphVideo"
+                deta_put_instagram(username=username,key_id=id,owner_id=owner_id,item_type=item_type,is_video=is_video,media_url=media_objects,
+                            thumbnail_src=thumbnail_src,taken_at_timestamp=taken_at_timestamp,shortcode=shortcode,
+                            caption=caption,comments=comments,likes=likes,views=views,location=location,hashtags=hashtags,mentions=mentions)
+                for item_media in media_objects:
+                  if is_video:
+                    media_file_name = await upload_file_by_username(item_media.get('url'), "mp4", shortcode, username)
+                  else:
+                    media_file_name = await upload_file_by_username(item_media.get('url'), "jpg", shortcode, username)
+                  media_list.append(media_file_name)
+                  
+                for chat_id in chat_ids:
+                  if len(media_list) > 1:
+                    await send_telegram_group_media(media_list,caption, chat_id,shortcode)
+                  elif len(media_list) == 1 :
+                    file_name =  media_list[0]
+                    await send_telegram_media(file_name,caption, chat_id,shortcode,original_height,original_width)
+                  time.sleep(5)
+                for filename in media_list:
+                  os.remove(filename)
+                
+       
+      return True
+    else:
+      # return False if the username does not exist
+      return False
+  except Exception as e:
+    print(str(e))
+    return None
 
 #210233aecbmsh61a7cefbf2c880cp18192cjsnfa3cbdb526ff
 #9695caae8cmsh5842b4bfafdfb1bp1f2bb8jsncb130fa8e8be
@@ -495,7 +624,7 @@ async def json_to_base_db(username, json_string,_chat_id):
         media_file_name = await upload_file_by_username(media_url, "mp4", shortcode, username)
       else:
          media_file_name = await upload_file_by_username(media_url, "jpg", shortcode, username)
-      await send_telegram_media(media_file_name,caption, _chat_id,shortcode,height,width)
+      #await send_telegram_media(media_file_name,caption, _chat_id,shortcode,height,width)
       os.remove(media_file_name)
       time.sleep(5)
                              
@@ -506,7 +635,8 @@ async def json_to_base_db(username, json_string,_chat_id):
       "key": json_data["id"],
       "username": username,
       "media_count": json_data["count"],
-      "Tracking": True
+      "Tracking": True,
+      "chat_id":_chat_id
   }
   master_db = deta.Base("Instagram_Master")
   master_db.put(master_data)
@@ -685,88 +815,6 @@ async def progress(current, total, message, start):
 
     # Edit the message with the progress message
     await message.edit(progress_message)
-
-""" async def get_video_and_send_task(chat_id: str, video_shortcode: str):
-  try:
-    startmessage = await send_message_text("📥 Downloading Post...",chat_id)
-    db = deta.Base("Instagram_Master")
-    response = db.fetch()# check if the response has any items
-    video_sent = False  # flag to indicate if the video was sent
-
-    if response.items:
-      # return True if the username exists
-      for item in response.items:
-        video_data = await get_post_by_shortcode(video_shortcode,"mp4",item["username"])
-        if video_data is not None:
-           userdb = deta.Base(item["username"])
-           userdbresponse = userdb.fetch({"shortcode": video_shortcode})
-           video_file_name = f'{video_shortcode}.mp4'
-           with open(f'{video_shortcode}.mp4', 'wb') as file: # open a file with the same name and type as the video
-              file.write(video_data)
-           for useritem in userdbresponse.items:
-              #await send_message_video(video_file,useritem["caption"], chat_id,video_shortcode,useritem["height"],useritem["width"])
-              await send_telegram_media(video_file_name,useritem["caption"], chat_id,video_shortcode,useritem["height"],useritem["width"])
-              video_sent = True
-              break
-           if video_sent:
-              break   
-                   
-    if video_sent is False:
-      # return False if the username does not exist
-      insta_post = await get_instagram_post_by_shortcode(video_shortcode)
-      json_data = json_repair.loads(insta_post)
-      for item in json_data:
-        for sub_item in item['items']:
-          id = sub_item.get("id", "")
-          username = sub_item.get("user", {}).get("username", "")
-          owner_id = sub_item.get("user", {}).get("pk", "")
-          caption = sub_item.get("caption", {}).get("text", "")
-          product_type = sub_item.get("product_type", "")
-          if product_type == "clips":
-             is_video = True
-          else:
-             is_video = False
-          height = sub_item.get("original_height", "")
-          width = sub_item.get("original_width", "")
-          shortcode = sub_item.get("code", "")
-          taken_at_timestamp = sub_item.get("taken_at", "")
-          comments = sub_item.get("comment_count", "")
-          likes = sub_item.get("like_count", "")
-          views = sub_item.get("view_count", "")
-          location = sub_item.get("location", {}).get("name", "")
-          thumbnail_src = ""
-          hashtags = ""
-          mentions = ""
-          video_versions = sub_item.get('video_versions', [])
-          if(len(video_versions) > 1):
-             item_type = "GraphSidecar"
-          else:
-             item_type = "GraphVideo"
-          for video_version in video_versions:
-            video_url = video_version.get('url', '')
-      userexist = await is_Username_exist(username,chat_id)
-      if userexist is not False:
-          deta_put_instagram(username=username,key_id=id,owner_id=owner_id,item_type=item_type,is_video=is_video,video_url=video_url,
-                            height=height,width=width,thumbnail_src=thumbnail_src,taken_at_timestamp=taken_at_timestamp,shortcode=shortcode,
-                            caption=caption,comments=comments,likes=likes,views=views,location=location,hashtags=hashtags,mentions=mentions)
-          video_file = await upload_file_by_username(video_url,"mp4",video_shortcode,username)
-      else:
-         deta_put_instagram(username="others",key_id=id,owner_id=owner_id,item_type=item_type,is_video=is_video,video_url=video_url,
-                            height=height,width=width,thumbnail_src=thumbnail_src,taken_at_timestamp=taken_at_timestamp,shortcode=shortcode,
-                            caption=caption,comments=comments,likes=likes,views=views,location=location,hashtags=hashtags,mentions=mentions)
-         video_file = await upload_file_by_username(video_url,"mp4",video_shortcode,"others")
-
-      await send_telegram_media(video_file,caption, chat_id,video_shortcode,height,width)
-
-    
-    return True
-  except Exception as e:
-    await send_error(str(e),chat_id)
-    return None
-  finally:
-     os.remove(video_file)
-     await delete_message(chat_id,startmessage)
- """
 
 async def instagram_post_handler(chat_id: str, req_shortcode: str):
   try:
@@ -1128,6 +1176,11 @@ async def getvideo(request: Request):
            return "Url is not Valid !! "
     else:
         return "Missing parameters in query string"
+
+@app.get("/getupdates")
+async def getupdates(request: Request, background_tasks: BackgroundTasks):
+   background_tasks.add_task(get_update_post_handler)
+   return "Background Task Started"
 
 if __name__ == '__main__':
     uvicorn.run(app)
