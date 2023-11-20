@@ -371,20 +371,18 @@ async def get_all_instagram_posts_rotateKey(username, count,_chat_id):
         break  # break out of the loop
       except Exception as e:  # if there is an exception, handle it
         print(e)
-        rapid_db.update({
-            "key": item["key"],
-            "is_Primary": False
-        })
+        rapid_db.update({"is_Primary": False}, key= item["key"])
+
        # update the primary flag to False in the database
         index += 1  # increment the index by 1
-        if index < len(
-            items
-        ):  # if there is a next item in the list, update its primary flag to True in the database
+        if index < len(items):  # if there is a next item in the list, update its primary flag to True in the database
           next_item = items[index]
-          rapid_db.update({
-                  "key": next_item["key"],
-                  "is_Primary": True
-              })
+          rapid_db.update({"is_Primary": True}, key= next_item["key"])
+          response = rapid_db.fetch({"api_name": "Instagram-Data"})
+          items = response.items
+        else:
+          next_item = items[0]
+          rapid_db.update({"is_Primary": True}, key= next_item["key"])
           response = rapid_db.fetch({"api_name": "Instagram-Data"})
           items = response.items
     elif item["is_Primary"] is False:
@@ -409,20 +407,12 @@ async def get_new_instagram_posts_rotateKey(username):
         break  # break out of the loop
       except Exception as e:  # if there is an exception, handle it
         print(e)
-        rapid_db.update({
-            "key": item["key"],
-            "is_Primary": False
-        })
+        rapid_db.update({"is_Primary": False}, key= item["key"])
        # update the primary flag to False in the database
         index += 1  # increment the index by 1
-        if index < len(
-            items
-        ):  # if there is a next item in the list, update its primary flag to True in the database
+        if index < len(items):  # if there is a next item in the list, update its primary flag to True in the database
           next_item = items[index]
-          rapid_db.update({
-                  "key": next_item["key"],
-                  "is_Primary": True
-              })
+          rapid_db.update({"is_Primary": True}, key= next_item["key"])
           response = rapid_db.fetch({"api_name": "Instagram-Data"})
           items = response.items
     elif item["is_Primary"] is False:
@@ -579,11 +569,17 @@ async def json_to_base_db(username, json_string,_chat_id):
   # Load the JSON data as a Python object
   json_data = json_repair.loads(json_string)
   itercount = 0
-  # Loop through the JSON data
+  message_response  = await send_message_text_old("📤 Downloading video..."+str(itercount),_chat_id)
+  
+  messageid = message_response["result"]["message_id"]
+  
+  
+    # Loop through the JSON data
   for item in json_data["collector"]:
+    itercount = itercount + 1
     try:
       # Extract the relevant fields from the item
-      itercount = itercount + 1
+      await edit_message("📤 Downloading video..."+itercount,_chat_id,messageid)
       print(itercount)
       id = item.get("id", "")
       owner_id = item.get("owner", {}).get("id", "")
@@ -623,14 +619,14 @@ async def json_to_base_db(username, json_string,_chat_id):
       if is_video:
         media_file_name = await upload_file_by_username(media_url, "mp4", shortcode, username)
       else:
-         media_file_name = await upload_file_by_username(media_url, "jpg", shortcode, username)
+        media_file_name = await upload_file_by_username(media_url, "jpg", shortcode, username)
       #await send_telegram_media(media_file_name,caption, _chat_id,shortcode,height,width)
       os.remove(media_file_name)
-      time.sleep(5)
-                             
+      time.sleep(5)                       
     except Exception as e:
-      print(e)
-      continue
+        print(e)
+        continue
+  
   master_data = {
       "key": json_data["id"],
       "username": username,
@@ -640,6 +636,9 @@ async def json_to_base_db(username, json_string,_chat_id):
   }
   master_db = deta.Base("Instagram_Master")
   master_db.put(master_data)
+  
+  await delete_message(_chat_id,messageid)
+
   return
 
 async def get_all_media_to_drive(username):
@@ -652,8 +651,12 @@ async def get_all_media_to_drive(username):
       for item in response.items:
         try:
           if item["is_video"] is True :
-              itemcount = itemcount + 1
-              await upload_file_by_username(item["video_url"], "mp4", item["shortcode"], username)
+            itemcount = itemcount + 1
+            await upload_file_by_username(item["video_url"], "mp4", item["shortcode"], username)
+          elif item["is_video"] is False :
+            itemcount = itemcount + 1
+            await upload_file_by_username(item["video_url"], "jpg", item["shortcode"], username)
+          
         except Exception as e:
           # send_error("Error in get_all_media_to_drive #Loop items - " + str(e) ,_chat_id)
           print(e)
@@ -768,17 +771,23 @@ async def send_message_text(text_message,_chat_id):
       await send_error("Error in send_message_video - " + str(e), _chat_id)
       return None
   
-async def delete_message(chat_id,message):
-  try:
-     #with Client("my_account", api_id, api_hash,bot_token=BOT_KEY) as pyroapp:
-      # Send a message to indicate the start of the upload
-      # Delete the download message
-    async with Client("my_account", api_id, api_hash,bot_token=BOT_KEY) as pyroapp: 
-      await pyroapp.delete_messages(chat_id,message.id)
-      return "success"
-  except Exception as e:
-      print(e)
-      return None
+async def delete_message(chat_id,message_id):
+  async with aiohttp.ClientSession() as session: 
+    try:
+        # Send a message to indicate the start of the upload
+        # Delete the download message
+      #async with Client("my_account", api_id, api_hash,bot_token=BOT_KEY) as pyroapp: 
+        #await pyroapp.delete_messages(chat_id,message.id)
+        #return "success"
+        # use the deleteMessage method with the chat id and message id
+        delete_url = f"{BOT_URL}/deleteMessage"
+        payload = {"chat_id": chat_id, "message_id": message_id}
+        async with session.post(delete_url, json=payload) as response: # use post method to send message
+                    resp = await response.json() # get the response data as JSON
+                    return resp
+    except Exception as e:
+        print(e)
+        return None
   
 async def send_error(error_message,_chat_id):
     async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
@@ -791,6 +800,22 @@ async def send_error(error_message,_chat_id):
             except Exception as e:
                 print(e)
                 return None
+
+# define a function to edit the error message
+async def edit_message(new_message,_chat_id,message_id):
+    try:
+        async with aiohttp.ClientSession() as session: # use aiohttp instead of requests
+            try:
+                message_url = f"{BOT_URL}/editMessageText"
+                payload = {"text": new_message, "chat_id": _chat_id, "message_id": message_id}
+                async with session.post(message_url, json=payload) as response: # use post method to send message
+                    resp = await response.json() # get the response data as JSON
+                    return resp
+            except Exception as e:
+                print(e)
+                return None
+    except Exception as e:
+        print(e)
 
 async def get_webhook_info():
     """Get the current webhook information from Telegram API"""
