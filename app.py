@@ -579,7 +579,7 @@ async def json_to_base_db(username, json_string,_chat_id):
     itercount = itercount + 1
     try:
       # Extract the relevant fields from the item
-      await edit_message("📤 Downloading video..."+itercount,_chat_id,messageid)
+      await edit_message("📤 Downloading video..."+str(itercount),_chat_id,messageid)
       print(itercount)
       id = item.get("id", "")
       owner_id = item.get("owner", {}).get("id", "")
