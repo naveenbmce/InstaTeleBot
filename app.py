@@ -624,7 +624,7 @@ async def json_to_base_db(username, json_string,_chat_id):
         media_file_name = await upload_file_by_username(media_url, "jpg", shortcode, username)
       #await send_telegram_media(media_file_name,caption, _chat_id,shortcode,height,width)
       os.remove(media_file_name)
-      time.sleep(5)                       
+      #time.sleep(5)                       
     except Exception as e:
         print(e)
         continue
@@ -1084,6 +1084,10 @@ async def get_webhook():
     """Return the current webhook information"""
     return await get_webhook_info()
 
+@app.get("/echo")
+async def echo():
+    return "Server is Live"
+
 @app.get("/SaveKey")
 def SaveKey():
   rapid_db = deta.Base("Rapid_API_Keys")
@@ -1222,6 +1226,8 @@ async def getvideo(request: Request):
 async def getupdates(request: Request, background_tasks: BackgroundTasks):
    background_tasks.add_task(get_update_post_handler)
    return "Background Task Started"
+
+
 
 if __name__ == '__main__':
     uvicorn.run(app)
