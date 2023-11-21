@@ -367,6 +367,7 @@ async def get_all_instagram_posts_rotateKey(username, count,_chat_id):
         print("Function get_instagram_posts")
         await get_all_instagram_posts(username, count, item["key"],_chat_id)  # call the get_instagram_posts function with the key and store the data
         await get_all_Post_from_DB(username, _chat_id)
+        
         success = True  # set the success flag to True
         break  # break out of the loop
       except Exception as e:  # if there is an exception, handle it
@@ -385,6 +386,7 @@ async def get_all_instagram_posts_rotateKey(username, count,_chat_id):
           rapid_db.update({"is_Primary": True}, key= next_item["key"])
           response = rapid_db.fetch({"api_name": "Instagram-Data"})
           items = response.items
+          break
     elif item["is_Primary"] is False:
       index += 1
   return "Success"
