@@ -15,6 +15,7 @@ from pyrogram import Client
 import asyncio
 from pyrogram.types import InlineKeyboardMarkup,InlineKeyboardButton,InputMediaPhoto,InputMediaVideo
 import time
+import http.client
 #Uncomment the below line if it is codespace
 #from dotenv import load_dotenv
 #load_dotenv()
@@ -319,7 +320,7 @@ async def get_all_Post_from_DB(username,_chat_id):
     await send_error("Error in get_all_Post_from_DB - " + str(e) ,_chat_id)
     return None
 
-async def get_all_instagram_posts(username, count, RapidAPI_Key,_chat_id):
+async def get_all_instagram_posts_v1(username, count, RapidAPI_Key,_chat_id):
   try:
     headers = {
         'X-RapidAPI-Key': RapidAPI_Key,
@@ -354,7 +355,47 @@ async def get_all_instagram_posts(username, count, RapidAPI_Key,_chat_id):
 
   return data  # return the data list
 
-async def get_all_instagram_posts_rotateKey(username, count,_chat_id):
+async def get_all_instagram_posts_v2(userid, count, RapidAPI_Key,_chat_id):
+  try:
+    headers = {
+        'X-RapidAPI-Key': "465b5f19a2msh50d8fa00d5cf9ccp10b263jsn9626a9c3663a",
+        'X-RapidAPI-Host': "rocketapi-for-instagram.p.rapidapi.com"
+    }
+    #payload = "{\r\"id\": 12281817,\r\"count\": 12,\r\"max_id\": null\r}"
+    data = []  # initialize an empty list to store the posts
+    request_count = 0
+    end_cursor = None  # initialize a variable to store the end cursor
+    has_more = True  # initialize a variable to store the has more flag
+    requestURL = "/instagram/user/get_media"
+    conn = http.client.HTTPSConnection("rocketapi-for-instagram.p.rapidapi.com") # create an HTTPS connection object
+    while has_more:  # loop until there are no more posts
+        payload = {"id": int(userid), "count": count, "max_id": end_cursor} # create the payload as a dictionary
+        print(requestURL)
+        conn.request("POST", requestURL, json.dumps(payload), headers) # make the request with the parameters
+        res = conn.getresponse() # get the response object
+        status = res.status
+        # print the status code for debugging
+        print(status)
+        if status == 200:
+            request_count = request_count + 1
+            res_data = res.read() # read the response data as bytes
+            res_data = res_data.decode("utf-8") # decode the bytes to a string
+            res_data = json_repair.loads(res_data)
+            #await json_to_base_db(username, res_data,_chat_id)
+            #await get_all_media_to_drive(username)
+            
+            end_cursor = res_data["response"]["body"].get("next_max_id")
+            has_more = res_data["response"]["body"].get("more_available")  # update the has more flag
+            data.extend(res_data["response"]["body"]["items"])
+        else:
+            has_more = False
+            raise Exception(f"Could not get a successful response given key")
+    print(str(request_count))
+    return data
+  except Exception as e:
+    raise Exception(f"Could not get a successful response given key")
+  
+async def get_all_instagram_posts_rotateKey(userid, count,_chat_id):
   rapid_db = deta.Base("Rapid_API_Keys")
   response = rapid_db.fetch({"api_name": "Instagram-Data"})
   items = response.items  # get the list of items from the response
@@ -365,8 +406,9 @@ async def get_all_instagram_posts_rotateKey(username, count,_chat_id):
     if item["is_Primary"] is True:  # if the item is primary, use its key
       try:
         print("Function get_instagram_posts")
-        await get_all_instagram_posts(username, count, item["key"],_chat_id)  # call the get_instagram_posts function with the key and store the data
-        await get_all_Post_from_DB(username, _chat_id)
+        #await get_all_instagram_posts_v1(username, count, item["key"],_chat_id)  # call the get_instagram_posts function with the key and store the data
+        response_data = await get_all_instagram_posts_v2(userid, count, item["key"],_chat_id)
+        #await get_all_Post_from_DB(username, _chat_id)
         
         success = True  # set the success flag to True
         break  # break out of the loop
@@ -1052,6 +1094,39 @@ async def stream_video_from_file(file_path: str):
             # Yield the chunk of data
             yield data
 
+async def get_profile_by_username(username,_chat_id):
+  url = f"https://instagram-bulk-profile-scrapper.p.rapidapi.com/clients/api/ig/ig_profile?ig={username}&response_type=short&corsEnabled=false"
+  headers = {
+      'X-RapidAPI-Key': "210233aecbmsh61a7cefbf2c880cp18192cjsnfa3cbdb526ff",
+      'X-RapidAPI-Host': "instagram-bulk-profile-scrapper.p.rapidapi.com"
+  }
+  async with aiohttp.ClientSession() as session:
+      async with session.get(url, headers=headers) as resp:
+        data = await resp.text()
+        print(data)
+        if resp.status == 200:
+           json_data = json_repair.loads(data)
+           for item in json_data:
+              profile_hd = item.get('profile_pic_url_hd')
+              user_id = item.get('pk')
+              username = item.get('username')
+              media_count = item.get('media_count')
+              keyboard = InlineKeyboardMarkup([
+                  [ # Row 1 button
+                      InlineKeyboardButton(
+                          text=f'Get Media : {media_count}',
+                          callback_data=f'get_media_{user_id}'
+                      )
+                  ]
+              ])
+              async with Client("my_account", api_id, api_hash,bot_token=BOT_KEY) as pyroapp:
+                 await pyroapp.send_photo(chat_id  = _chat_id, photo = profile_hd,caption = username,reply_markup=keyboard)
+                 
+           return data
+        else :
+          return None
+            
+
 @app.get("/set_webhook")
 async def url_setter():
     """Set the webhook URL for Telegram API"""
@@ -1126,16 +1201,25 @@ async def http_handler(request: Request, background_tasks: BackgroundTasks):
     """Handle the incoming messages from Telegram"""
     try:
         incoming_data = await request.json() # parse the request data as JSON
-        prompt = incoming_data.get("message", {}).get("text", "No text found") # get the text from the message
-        chat_id = incoming_data["message"]["chat"]["id"] # get the chat id from the message
+        callback_data = incoming_data.get("callback_query")
+        if callback_data:
+          prompt = callback_data.get("data") # get the text from the message
+          chat_id = callback_data["message"]["chat"]["id"] # get the chat id from the message
+        else:
+          prompt = incoming_data.get("message", {}).get("text", "No text found") # get the text from the message
+          chat_id = incoming_data["message"]["chat"]["id"] # get the chat id from the message
     except Exception as e:
         print(e)
         return None
     
-    if "message" not in incoming_data:
-        print(incoming_data)
-        return await send_error(None, "Unknown error, lol, handling coming soon")
-
+    #if "message" not in incoming_data:
+        #print(incoming_data)
+        #return await send_error(None, "Unknown error, lol, handling coming soon")
+    if "get_media_" in prompt:
+       userid = prompt.split("get_media_")[1]
+       background_tasks.add_task(get_all_instagram_posts_rotateKey, userid=userid, count=50,_chat_id=chat_id)
+       return
+    
     if prompt in ["/start", "/help"]:
         response_text = (
             "welcome to InstgramBot"
@@ -1174,7 +1258,8 @@ async def http_handler(request: Request, background_tasks: BackgroundTasks):
             except Exception as e:
               await send_error(response_text,chat_id)
           else:
-            background_tasks.add_task(get_all_instagram_posts_rotateKey, username=profile_username, count=50,_chat_id=chat_id)
+            #background_tasks.add_task(get_all_instagram_posts_rotateKey, username=profile_username, count=50,_chat_id=chat_id)
+            background_tasks.add_task(get_profile_by_username, username=profile_username,_chat_id=chat_id)
             await send_message_text(" - User Not Exist in db - Download Task Started ",chat_id)
             
     else:
