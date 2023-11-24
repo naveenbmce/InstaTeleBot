@@ -175,22 +175,26 @@ async def send_telegram_media(file_name,_caption, _chat_id, _fileName,_height,_w
     #await bot.send_video(chat_id = _chat_id, video=video_file,caption = _caption, height = _height,width =_width,supports_streaming=True)
     async with Client("my_account", api_id, api_hash,bot_token=BOT_KEY) as pyroapp:
         # Send a message to indicate the start of the upload
-        message = await pyroapp.send_message(chat_id=_chat_id, text="📤 Uploading video...")
+        message = await pyroapp.send_message(chat_id=_chat_id, text="📤 Uploading media...")
         # Get the current time
         start = time.time()
         
         try:
             if extension == ".mp4":
+              if os.path.exists(f'thumb_{root}.jpg'):
+                 thumb = f'thumb_{root}.jpg'
+              else:
+                 thumb = None
             # Send the video with the custom progress function
               #await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress, progress_args=(message, start))
-              await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard)
+              await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard,thumb=thumb)
             elif extension == ".jpg":
               #await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard, progress=progress, progress_args=(message, start))
               await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard)
         except:
           time.sleep(5)
           if extension == ".mp4":
-            await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard)
+            await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard,thumb=thumb)
           elif extension == ".jpg":
             await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard)
         finally:
@@ -251,7 +255,7 @@ async def send_telegram_group_media(media_urls, _caption, _chat_id, _fileName):
                 )
             ]
         ])
-        _caption:_caption[:1024]
+        #_caption:_caption[:1024]
         async with Client("my_account", api_id, api_hash, bot_token=BOT_KEY) as pyroapp:
             # Send a message to indicate the start of the upload
             message = await pyroapp.send_message(chat_id=_chat_id, text="📤 Uploading media...")
@@ -265,16 +269,17 @@ async def send_telegram_group_media(media_urls, _caption, _chat_id, _fileName):
                     # Check if the URL ends with ".mp4"
                     if url.endswith(".mp4"):
                         # Add it as a video
-                        media.append(InputMediaVideo(url, caption=_caption))
+                        media.append(InputMediaVideo(url))
                     # Check if the URL ends with ".jpg"
                     elif url.endswith(".jpg"):
                         # Add it as a photo
-                        media.append(InputMediaPhoto(url, caption=_caption))
+                        media.append(InputMediaPhoto(url))
                 # Send the media with the custom progress function
                 await pyroapp.send_media_group(
                     chat_id=_chat_id,
                     media=media
                 )
+                await pyroapp.send_message(chat_id=_chat_id, text=_caption)
             except:
                 await pyroapp.send_media_group(
                     chat_id=_chat_id,
@@ -406,17 +411,14 @@ async def upload_and_send_all_post(datalist,chat_id):
    datalist.reverse()
    userid = ""
    Total_media = len(datalist)
-   #message_response  = await send_message_text_old("📤 Downloading video..."+str(itercount),chat_id)
-   #messageid = message_response["result"]["message_id"]
    for sub_item in datalist:
     itercount = itercount + 1
     try:
       media_objects = []
       media_list = []
       # Extract the relevant fields from the item
-      message_response  = await send_message_text_old(f'📤 Downloading video...{str(itercount)}/{Total_media}',chat_id)
+      message_response  = await send_message_text_old(f'📤 Downloading post...{str(itercount)}/{Total_media}',chat_id)
       messageid = message_response["result"]["message_id"]
-      #await edit_message("📤 Downloading video..."+str(itercount),chat_id,messageid)
       print(itercount)
       id = sub_item.get("id", "")
       username = sub_item.get("user", {}).get("username", "")
@@ -442,6 +444,8 @@ async def upload_and_send_all_post(datalist,chat_id):
       video_versions = sub_item.get('video_versions', [])
       if(len(video_versions) >= 1):
         media_candidates = video_versions
+        thumb_versions = sub_item.get('image_versions2', {})
+        thumbnail_candidates = thumb_versions.get('candidates', [])
       else:
         image_versions = sub_item.get('image_versions2', {})
         media_candidates = image_versions.get('candidates', [])
@@ -463,12 +467,21 @@ async def upload_and_send_all_post(datalist,chat_id):
                 'url': image_url,
                 'short_code': f'{sub_item.get("code", "")}_{carousel_count}',
                 'height': height,
-                'width': width
+                'width': width,
+                'thumb': None if sub_item.get('media_type') == 1 else sub_item.get("thumbnail_src", "")
             }
             # Add the object to the list
             media_objects.append(media_object)
 
       if not media_objects:
+        thumbnail_url = None
+        if sub_item.get('media_type') == 1:
+           thumbnail_url = None
+        else:
+           for thum_item in thumbnail_candidates:
+              if thum_item.get('width') == 750:
+                thumbnail_url = thum_item.get('url')
+
         last_candidate = media_candidates[0]
         image_url = last_candidate.get('url', '')
         print(image_url)
@@ -477,7 +490,8 @@ async def upload_and_send_all_post(datalist,chat_id):
                 'url': image_url,
                 'short_code': sub_item.get("code", ""),
                 'height': sub_item.get("original_height", ""),
-                'width': sub_item.get("original_width", "")
+                'width': sub_item.get("original_width", ""),
+                'thumb': thumbnail_url
             }
         media_objects.append(media_object)
       
@@ -494,6 +508,7 @@ async def upload_and_send_all_post(datalist,chat_id):
       for item_media in media_objects:
         if is_video:
           media_file_name = await upload_file_by_username(item_media.get('url'), "mp4", item_media.get('short_code'), username)
+          thumb_media_file_name = await upload_file_by_username(item_media.get('thumb'), "jpg", "thumb_"+str(shortcode), username)
         else:
           media_file_name = await upload_file_by_username(item_media.get('url'), "jpg", item_media.get('short_code'), username)
         media_list.append(media_file_name)
@@ -505,7 +520,12 @@ async def upload_and_send_all_post(datalist,chat_id):
         await send_telegram_media(file_name,caption, chat_id,shortcode,original_height,original_width)
       time.sleep(5)
       for filename in media_list:
-        os.remove(filename)
+        root, extension = os.path.splitext(filename)
+        if extension == ".mp4":
+          os.remove(filename)
+          os.remove(f'thumb_{root}.jpg')
+        else:
+           os.remove(filename)
       
       
     except Exception as e:
