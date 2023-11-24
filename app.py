@@ -159,6 +159,7 @@ async def progress(current, total, message, start):
 async def send_telegram_media(file_name,_caption, _chat_id, _fileName,_height,_width):
   try:
     root, extension = os.path.splitext(file_name)
+    _caption:_caption[:1024]
     keyboard = InlineKeyboardMarkup([
         [ # Row 1 button
             InlineKeyboardButton(
@@ -214,6 +215,7 @@ async def send_telegram_photo(photo_file_path,_caption, _chat_id, _fileName):
             )
         ]
     ])
+    _caption:_caption[:1024]
     #await bot.send_video(chat_id = _chat_id, video=video_file,caption = _caption, height = _height,width =_width,supports_streaming=True)
     async with Client("my_account", api_id, api_hash,bot_token=BOT_KEY) as pyroapp:
         # Send a message to indicate the start of the upload
@@ -249,6 +251,7 @@ async def send_telegram_group_media(media_urls, _caption, _chat_id, _fileName):
                 )
             ]
         ])
+        _caption:_caption[:1024]
         async with Client("my_account", api_id, api_hash, bot_token=BOT_KEY) as pyroapp:
             # Send a message to indicate the start of the upload
             message = await pyroapp.send_message(chat_id=_chat_id, text="📤 Uploading media...")
@@ -364,6 +367,7 @@ async def get_all_instagram_posts_v2(userid, count, RapidAPI_Key,_chat_id):
     #payload = "{\r\"id\": 12281817,\r\"count\": 12,\r\"max_id\": null\r}"
     data = []  # initialize an empty list to store the posts
     request_count = 0
+    media_count = 0
     end_cursor = None  # initialize a variable to store the end cursor
     has_more = True  # initialize a variable to store the has more flag
     requestURL = "/instagram/user/get_media"
@@ -385,16 +389,144 @@ async def get_all_instagram_posts_v2(userid, count, RapidAPI_Key,_chat_id):
             #await get_all_media_to_drive(username)
             
             end_cursor = res_data["response"]["body"].get("next_max_id")
-            has_more = res_data["response"]["body"].get("more_available")  # update the has more flag
+            #has_more = res_data["response"]["body"].get("more_available")  # update the has more flag
+            has_more = False
             data.extend(res_data["response"]["body"]["items"])
         else:
             has_more = False
             raise Exception(f"Could not get a successful response given key")
     print(str(request_count))
-    return data
+    return data,request_count
   except Exception as e:
     raise Exception(f"Could not get a successful response given key")
-  
+
+async def upload_and_send_all_post(datalist,chat_id):
+  try:
+   itercount = 0
+   datalist.reverse()
+   userid = ""
+   Total_media = len(datalist)
+   #message_response  = await send_message_text_old("📤 Downloading video..."+str(itercount),chat_id)
+   #messageid = message_response["result"]["message_id"]
+   for sub_item in datalist:
+    itercount = itercount + 1
+    try:
+      media_objects = []
+      media_list = []
+      # Extract the relevant fields from the item
+      message_response  = await send_message_text_old(f'📤 Downloading video...{str(itercount)}/{Total_media}',chat_id)
+      messageid = message_response["result"]["message_id"]
+      #await edit_message("📤 Downloading video..."+str(itercount),chat_id,messageid)
+      print(itercount)
+      id = sub_item.get("id", "")
+      username = sub_item.get("user", {}).get("username", "")
+      owner_id = sub_item.get("user", {}).get("pk", "")
+      userid = str(owner_id)
+      original_height = sub_item.get("original_height", "")
+      original_width = sub_item.get("original_width", "")
+      caption = sub_item.get("caption", {}).get("text", "")
+      product_type = sub_item.get("product_type", "")
+      if product_type == "clips":
+        is_video = True
+      else:
+        is_video = False
+      shortcode = sub_item.get("code", "")
+      taken_at_timestamp = sub_item.get("taken_at", "")
+      comments = sub_item.get("comment_count", "")
+      likes = sub_item.get("like_count", "")
+      views = sub_item.get("view_count", "")
+      location = sub_item.get("location", {}).get("name", "")
+      thumbnail_src = ""
+      hashtags = ""
+      mentions = ""
+      video_versions = sub_item.get('video_versions', [])
+      if(len(video_versions) >= 1):
+        media_candidates = video_versions
+      else:
+        image_versions = sub_item.get('image_versions2', {})
+        media_candidates = image_versions.get('candidates', [])
+      carousel_count = 0
+      for carousel in sub_item.get('carousel_media', []):
+          # Get the list of candidates
+          carousel_count = 1 + carousel_count
+          candidates = carousel.get('image_versions2', {}).get('candidates', [])
+          # Get the last candidate (1080p image)
+          last_candidate = candidates[0] if candidates else {}
+          # Get the URL of the image
+          image_url = last_candidate.get('url', '')
+          height = last_candidate.get('height', '')
+          width = last_candidate.get('width', '')
+          # Create an object with media type and URL
+          if image_url :
+            media_object = {
+                'media_type': 'image' if carousel.get('media_type') == 1 else 'video',
+                'url': image_url,
+                'short_code': f'{sub_item.get("code", "")}_{carousel_count}',
+                'height': height,
+                'width': width
+            }
+            # Add the object to the list
+            media_objects.append(media_object)
+
+      if not media_objects:
+        last_candidate = media_candidates[0]
+        image_url = last_candidate.get('url', '')
+        print(image_url)
+        media_object = {
+                'media_type': 'image' if sub_item.get('media_type') == 1 else 'video',
+                'url': image_url,
+                'short_code': sub_item.get("code", ""),
+                'height': sub_item.get("original_height", ""),
+                'width': sub_item.get("original_width", "")
+            }
+        media_objects.append(media_object)
+      
+      if(len(media_objects) > 1):
+            item_type = "GraphSidecar"
+      elif media_objects[0].get('media_type') == "image":
+            item_type = "GraphImage"
+      elif media_objects[0].get('media_type') == "video":
+            item_type = "GraphVideo"
+      deta_put_instagram(username=username,key_id=id,owner_id=owner_id,item_type=item_type,is_video=is_video,media_url=media_objects,
+                  thumbnail_src=thumbnail_src,taken_at_timestamp=taken_at_timestamp,shortcode=shortcode,
+                  caption=caption,comments=comments,likes=likes,views=views,location=location,hashtags=hashtags,mentions=mentions)
+      await delete_message(chat_id,messageid)
+      for item_media in media_objects:
+        if is_video:
+          media_file_name = await upload_file_by_username(item_media.get('url'), "mp4", item_media.get('short_code'), username)
+        else:
+          media_file_name = await upload_file_by_username(item_media.get('url'), "jpg", item_media.get('short_code'), username)
+        media_list.append(media_file_name)
+        
+      if len(media_list) > 1:
+        await send_telegram_group_media(media_list,caption, chat_id,shortcode)
+      elif len(media_list) == 1 :
+        file_name =  media_list[0]
+        await send_telegram_media(file_name,caption, chat_id,shortcode,original_height,original_width)
+      time.sleep(5)
+      for filename in media_list:
+        os.remove(filename)
+      
+      
+    except Exception as e:
+        print(e)
+        continue
+
+   master_data = {
+      "key": userid,
+      "username": username,
+      "media_count": "",
+      "Tracking": False,
+      "chat_id":chat_id
+    }
+   master_db = deta.Base("Instagram_Master")
+   master_db.put(master_data)
+   return True
+  except Exception as e:
+    print(e)
+    return False
+
+
 async def get_all_instagram_posts_rotateKey(userid, count,_chat_id):
   rapid_db = deta.Base("Rapid_API_Keys")
   response = rapid_db.fetch({"api_name": "Instagram-Data"})
@@ -407,7 +539,12 @@ async def get_all_instagram_posts_rotateKey(userid, count,_chat_id):
       try:
         print("Function get_instagram_posts")
         #await get_all_instagram_posts_v1(username, count, item["key"],_chat_id)  # call the get_instagram_posts function with the key and store the data
-        response_data = await get_all_instagram_posts_v2(userid, count, item["key"],_chat_id)
+        response_data,request_count = await get_all_instagram_posts_v2(userid, count, item["key"],_chat_id)
+        is_task_complete = await upload_and_send_all_post(response_data,_chat_id)
+
+        if is_task_complete:
+          summary_messgae = f"✔️ Task Completed...\n\n▪️ Total Fetched Media: {str(len(response_data))}\n▪️ Request Consumed: {str(request_count)}"
+          await send_message_text_old(summary_messgae,_chat_id)
         #await get_all_Post_from_DB(username, _chat_id)
         
         success = True  # set the success flag to True
