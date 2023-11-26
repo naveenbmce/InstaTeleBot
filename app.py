@@ -16,9 +16,10 @@ import asyncio
 from pyrogram.types import InlineKeyboardMarkup,InlineKeyboardButton,InputMediaPhoto,InputMediaVideo
 import time
 import http.client
+import subprocess
 #Uncomment the below line if it is codespace
-#from dotenv import load_dotenv
-#load_dotenv()
+from dotenv import load_dotenv
+load_dotenv()
 
 app = FastAPI()
 BOT_KEY = os.environ["TELEGRAM_BOT_KEY"] # get the bot token from environment variable
@@ -61,6 +62,19 @@ def format_size(bytes):
         else:
             # Return the value in MB with one decimal place
             return f"{mb:.1f} MB"
+
+def video_to_thumbnail(video_file, thumbnail_file, time):
+    # Use ffmpeg command to extract a frame at the given time
+    command = ["ffmpeg", "-i", video_file, "-ss", time, "-vframes", 1, thumbnail_file]
+    # Run the command and capture the output
+    output = subprocess.run(command, capture_output=True)
+    # Check if the command was successful
+    if output.returncode == 0:
+        # Return the thumbnail file name
+        return thumbnail_file
+    else:
+        # Return an error message
+        return output.stderr.decode()
 
 async def get_post_details_by_shortcode(_shortcode,_username):
     try:
@@ -366,7 +380,7 @@ async def get_all_instagram_posts_v1(username, count, RapidAPI_Key,_chat_id):
 async def get_all_instagram_posts_v2(userid, count, RapidAPI_Key,_chat_id):
   try:
     headers = {
-        'X-RapidAPI-Key': "465b5f19a2msh50d8fa00d5cf9ccp10b263jsn9626a9c3663a",
+        'X-RapidAPI-Key': RapidAPI_Key,
         'X-RapidAPI-Host': "rocketapi-for-instagram.p.rapidapi.com"
     }
     #payload = "{\r\"id\": 12281817,\r\"count\": 12,\r\"max_id\": null\r}"
@@ -508,7 +522,9 @@ async def upload_and_send_all_post(datalist,chat_id):
       for item_media in media_objects:
         if is_video:
           media_file_name = await upload_file_by_username(item_media.get('url'), "mp4", item_media.get('short_code'), username)
-          thumb_media_file_name = await upload_file_by_username(item_media.get('thumb'), "jpg", "thumb_"+str(shortcode), username)
+          root, extension = os.path.splitext(media_file_name)
+          thumb_media_file_name  = video_to_thumbnail(media_file_name, f'thumb_{root}.jpg', "00:00:01.000")
+          #thumb_media_file_name = await upload_file_by_username(item_media.get('thumb'), "jpg", "thumb_"+str(shortcode), username)
         else:
           media_file_name = await upload_file_by_username(item_media.get('url'), "jpg", item_media.get('short_code'), username)
         media_list.append(media_file_name)
@@ -545,7 +561,6 @@ async def upload_and_send_all_post(datalist,chat_id):
   except Exception as e:
     print(e)
     return False
-
 
 async def get_all_instagram_posts_rotateKey(userid, count,_chat_id):
   rapid_db = deta.Base("Rapid_API_Keys")
