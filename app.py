@@ -64,8 +64,9 @@ def format_size(bytes):
             return f"{mb:.1f} MB"
 
 def video_to_thumbnail(video_file, thumbnail_file, time):
+    
     # Use ffmpeg command to extract a frame at the given time
-    command = ["ffmpeg", "-i", video_file, "-ss", time, "-vframes", 1, thumbnail_file]
+    command = ["ffmpeg", "-i", video_file, "-ss", time, "-vframes", str(1), thumbnail_file]
     # Run the command and capture the output
     output = subprocess.run(command, capture_output=True)
     # Check if the command was successful
@@ -173,7 +174,7 @@ async def progress(current, total, message, start):
 async def send_telegram_media(file_name,_caption, _chat_id, _fileName,_height,_width):
   try:
     root, extension = os.path.splitext(file_name)
-    _caption:_caption[:1024]
+    _new_caption =_caption[:1024]
     keyboard = InlineKeyboardMarkup([
         [ # Row 1 button
             InlineKeyboardButton(
@@ -201,16 +202,16 @@ async def send_telegram_media(file_name,_caption, _chat_id, _fileName,_height,_w
                  thumb = None
             # Send the video with the custom progress function
               #await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard, progress=progress, progress_args=(message, start))
-              await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard,thumb=thumb)
+              await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _new_caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard,thumb=thumb)
             elif extension == ".jpg":
               #await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard, progress=progress, progress_args=(message, start))
-              await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard)
+              await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _new_caption,reply_markup=keyboard)
         except:
           time.sleep(5)
           if extension == ".mp4":
-            await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard,thumb=thumb)
+            await pyroapp.send_video(chat_id  = _chat_id, video = file_name,caption = _new_caption,height = _height,width =_width,supports_streaming=True,reply_markup=keyboard,thumb=thumb)
           elif extension == ".jpg":
-            await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _caption,reply_markup=keyboard)
+            await pyroapp.send_photo(chat_id  = _chat_id, photo = file_name,caption = _new_caption,reply_markup=keyboard)
         finally:
             #os.remove(file_name)
             await message.delete()
@@ -233,7 +234,7 @@ async def send_telegram_photo(photo_file_path,_caption, _chat_id, _fileName):
             )
         ]
     ])
-    _caption:_caption[:1024]
+    _new_caption=_caption[:1024]
     #await bot.send_video(chat_id = _chat_id, video=video_file,caption = _caption, height = _height,width =_width,supports_streaming=True)
     async with Client("my_account", api_id, api_hash,bot_token=BOT_KEY) as pyroapp:
         # Send a message to indicate the start of the upload
@@ -243,10 +244,10 @@ async def send_telegram_photo(photo_file_path,_caption, _chat_id, _fileName):
         try:
           # Send the video with the custom progress function
             #await pyroapp.send_photo(chat_id  = _chat_id, photo = photo_file_path,caption = _caption,reply_markup=keyboard, progress=progress, progress_args=(message, start))
-            await pyroapp.send_photo(chat_id  = _chat_id, photo = photo_file_path,caption = _caption,reply_markup=keyboard)
+            await pyroapp.send_photo(chat_id  = _chat_id, photo = photo_file_path,caption = _new_caption,reply_markup=keyboard)
           # Delete the progress message
         except:
-           await pyroapp.send_photo(chat_id  = _chat_id, photo = photo_file_path,caption = _caption,reply_markup=keyboard)
+           await pyroapp.send_photo(chat_id  = _chat_id, photo = photo_file_path,caption = _new_caption,reply_markup=keyboard)
         finally:
             os.remove(photo_file_path)
             await message.delete()
