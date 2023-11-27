@@ -409,8 +409,8 @@ async def get_all_instagram_posts_v2(userid, count, RapidAPI_Key,_chat_id):
             #await get_all_media_to_drive(username)
             
             end_cursor = res_data["response"]["body"].get("next_max_id")
-            #has_more = res_data["response"]["body"].get("more_available")  # update the has more flag
-            has_more = False
+            has_more = res_data["response"]["body"].get("more_available")  # update the has more flag
+            #has_more = False
             data.extend(res_data["response"]["body"]["items"])
         else:
             has_more = False
